@@ -1,6 +1,11 @@
 (function(root){
   const MAX_TIMER=100*3600000-1000;
   function hourFraction(remainingMs){return Math.max(0,Math.min(1,remainingMs/3600000));}
+  function minuteFraction(remainingMs){return remainingMs>0?(remainingMs%60000||60000)/60000:0;}
+  function countdownText(remainingMs){
+    const seconds=Math.max(0,Math.ceil(remainingMs/1000));
+    return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
+  }
   function remaining(timer,now=Date.now()){
     return Math.max(0,timer.status==='running'?timer.endAt-now:timer.remainingMs);
   }
@@ -38,6 +43,6 @@
     const today=build(0);
     return today.length&&today.every(timer=>timer.at<=now.getTime())?build(1):today;
   }
-  const api={MAX_TIMER,hourFraction,remaining,elapsed,durationText,activityTargets,localParts};
+  const api={MAX_TIMER,hourFraction,minuteFraction,countdownText,remaining,elapsed,durationText,activityTargets,localParts};
   if(typeof module!=='undefined')module.exports=api;else root.KitchenTiming=api;
 })(globalThis);

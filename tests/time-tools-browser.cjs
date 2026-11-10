@@ -56,21 +56,32 @@ async function until(page,predicate){for(let i=0;i<150;i++){if(await page.evalua
     assert.equal(await page.locator('#activity-focus-title').textContent(),'First activity');
     await page.evaluate(()=>{window.activityOriginalNow=Date.now;window.focusedTestAt=Number(document.querySelector('.activity-timer').dataset.at);Date.now=()=>window.focusedTestAt-1800000;});
     await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='0.5');
-    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'00:30:00');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'30:00');
+    assert.equal(await page.locator('#activity-focus-state').count(),0,'No status label shifts the centred clock');
+    assert.equal(await page.locator('#activity-minute-ring').getAttribute('aria-valuenow'),'60.0');
     assert.equal(await page.locator('#activity-pie').getAttribute('aria-valuenow'),'30.0');
     assert.equal(await page.locator('#activity-dial').evaluate(el=>el.style.getPropertyValue('--pie-angle')),'180.000deg');
+    await page.evaluate(()=>Date.now=()=>window.focusedTestAt-1830000);
+    await until(page,()=>document.getElementById('activity-dial').dataset.minuteFraction==='0.5');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'30:30');
+    assert.equal(await page.locator('#activity-minute-ring').getAttribute('aria-valuenow'),'30.0');
+    assert.equal(await page.locator('#activity-dial').evaluate(el=>el.style.getPropertyValue('--minute-angle')),'180.000deg');
     for(const [width,height,name] of [[1080,1920,'activity-focus-portrait'],[1440,900,'activity-focus-desktop'],[390,844,'activity-focus-mobile'],[320,720,'activity-focus-small'],[900,540,'activity-focus-landscape']]){
       await page.setViewportSize({width,height});await page.waitForTimeout(150);
-      const fit=await page.evaluate(()=>{const options=document.querySelector('.activity-options').getBoundingClientRect(),focus=document.getElementById('activity-focus').getBoundingClientRect(),dial=document.getElementById('activity-dial').getBoundingClientRect(),clock=document.getElementById('activity-focus-remaining').getBoundingClientRect();return {below:focus.y>=options.bottom,bottom:Math.abs(focus.bottom-(innerHeight-(innerWidth<=700?18:28)))<2,circle:Math.abs(dial.width-dial.height)<1,size:dial.width,clock:clock.x>=dial.x&&clock.right<=dial.right&&clock.y>=dial.y&&clock.bottom<=dial.bottom,overflow:document.getElementById('time-tools').scrollHeight>document.getElementById('time-tools').clientHeight+1};});
-      assert(fit.below&&fit.bottom&&fit.circle&&fit.size>100&&fit.clock&&!fit.overflow,name+' fits: '+JSON.stringify(fit));
+      const fit=await page.evaluate(()=>{const options=document.querySelector('.activity-options').getBoundingClientRect(),focus=document.getElementById('activity-focus').getBoundingClientRect(),dial=document.getElementById('activity-dial').getBoundingClientRect(),clock=document.getElementById('activity-focus-remaining').getBoundingClientRect();return {below:focus.y>=options.bottom,bottom:Math.abs(focus.bottom-(innerHeight-(innerWidth<=700?18:28)))<2,circle:Math.abs(dial.width-dial.height)<1,size:dial.width,clock:clock.x>=dial.x&&clock.right<=dial.right&&clock.y>=dial.y&&clock.bottom<=dial.bottom,centred:Math.abs(clock.x+clock.width/2-dial.x-dial.width/2)<1&&Math.abs(clock.y+clock.height/2-dial.y-dial.height/2)<1,overflow:document.getElementById('time-tools').scrollHeight>document.getElementById('time-tools').clientHeight+1};});
+      assert(fit.below&&fit.bottom&&fit.circle&&fit.size>100&&fit.clock&&fit.centred&&!fit.overflow,name+' fits: '+JSON.stringify(fit));
       await page.screenshot({path:path.join(__dirname,'../test-results/'+name+'.png')});
     }
     await settings.locator('#theme').selectOption('dark');await until(page,()=>document.body.dataset.theme==='dark');await page.setViewportSize({width:1080,height:1920});await page.waitForTimeout(800);
     await page.screenshot({path:path.join(__dirname,'../test-results/activity-focus-dark.png')});
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt-7200000);await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='1');
-    assert.equal(await page.locator('#activity-focus-state').textContent(),'More than an hour');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'120:00','Hours become total minutes, not discarded time');
+    await page.evaluate(()=>Date.now=()=>window.focusedTestAt-1800001);
+    await until(page,()=>Number(document.getElementById('activity-dial').dataset.minuteFraction)<.001);
+    await page.evaluate(()=>Date.now=()=>window.focusedTestAt-1800000);
+    await until(page,()=>document.getElementById('activity-dial').dataset.minuteFraction==='1');
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt+1);await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='0');
-    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'00:00:00');assert.equal(await page.locator('#activity-focus-state').textContent(),'Time reached');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'00:00');assert.equal(await page.locator('#activity-dial').getAttribute('data-minute-fraction'),'0');
     await page.evaluate(()=>Date.now=window.activityOriginalNow);
     await page.locator('#activity-unfocus').click();assert(await page.locator('#activity-timers').isVisible());
     assert.equal(await page.locator('.activity-expand').first().evaluate(el=>el===document.activeElement),true,'Return restores keyboard focus');

@@ -92,7 +92,10 @@ after every timer for that activity has passed, it advances to its next occurren
 Progress bars show the final hour. Activity countdowns are visual, not audible
 alarms. Touch an activity countdown to fill the area below the activity controls
 with a large clock over a 60-minute pie countdown. More than an hour stays full;
-the final hour shrinks to empty at the target time. The back arrow or Escape
+the final hour shrinks to empty at the target time. The centred clock uses total
+minutes and seconds (`MM:SS`), without a status label. An outer seconds ring drains
+through each minute, refills at the next minute and stays empty when time is up.
+The back arrow or Escape
 returns to all activity timers; the X still closes the whole clock view. Camera
 and clock-view close buttons share the same styling and touch target.
 School holidays and one-off cancellations are not inferred: disable the

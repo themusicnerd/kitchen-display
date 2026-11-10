@@ -18,7 +18,7 @@
   const el=id=>document.getElementById(id);
   el('close-time-tools').classList.add('view-close');
   const activityFocus=document.createElement('section');activityFocus.id='activity-focus';activityFocus.className='activity-focus-view';activityFocus.hidden=true;activityFocus.setAttribute('aria-labelledby','activity-focus-title');
-  activityFocus.innerHTML='<header class="activity-focus-heading"><div><h3 id="activity-focus-title"></h3><p id="activity-focus-at" class="activity-at"></p></div><button id="activity-unfocus" class="icon-button view-close" type="button" title="All timers" aria-label="Back to all activity timers"><i data-lucide="arrow-left"></i></button></header><div id="activity-dial-space" class="activity-dial-space"><div id="activity-dial" class="activity-dial"><div id="activity-pie" class="activity-pie" role="progressbar" aria-valuemin="0" aria-valuemax="60"></div><span class="dial-mark dial-mark-top" aria-hidden="true">60</span><span class="dial-mark dial-mark-right" aria-hidden="true">15</span><span class="dial-mark dial-mark-bottom" aria-hidden="true">30</span><span class="dial-mark dial-mark-left" aria-hidden="true">45</span><div class="activity-focus-clock"><output id="activity-focus-remaining" role="timer"></output><p id="activity-focus-state"></p></div></div></div>';
+  activityFocus.innerHTML='<header class="activity-focus-heading"><div><h3 id="activity-focus-title"></h3><p id="activity-focus-at" class="activity-at"></p></div><button id="activity-unfocus" class="icon-button view-close" type="button" title="All timers" aria-label="Back to all activity timers"><i data-lucide="arrow-left"></i></button></header><div id="activity-dial-space" class="activity-dial-space"><div id="activity-dial" class="activity-dial"><div id="activity-pie" class="activity-pie" role="progressbar" aria-valuemin="0" aria-valuemax="60"></div><div id="activity-minute-ring" class="activity-minute-ring" role="progressbar" aria-label="Seconds remaining in this minute" aria-valuemin="0" aria-valuemax="60"></div><span class="dial-mark dial-mark-top" aria-hidden="true">60</span><span class="dial-mark dial-mark-right" aria-hidden="true">15</span><span class="dial-mark dial-mark-bottom" aria-hidden="true">30</span><span class="dial-mark dial-mark-left" aria-hidden="true">45</span><div class="activity-focus-clock"><output id="activity-focus-remaining" role="timer"></output></div></div></div>';
   el('pane-activities').append(activityFocus);
   let focusedActivity=null,activityOrigin=null,activityListScroll=0;
   function fitActivityDial(){
@@ -162,11 +162,14 @@
     if(dialog.open){
       if(view==='activities'&&focusedActivity){
         const remaining=Math.max(0,focusedActivity.at-now),fraction=T.hourFraction(remaining);
-        el('activity-focus-remaining').textContent=T.durationText(Math.ceil(remaining/1000)*1000);
-        el('activity-focus-state').textContent=remaining>3600000?'More than an hour':remaining?'Time remaining':'Time reached';
+        const minute=T.minuteFraction(remaining);
+        el('activity-focus-remaining').textContent=T.countdownText(remaining);
         el('activity-dial').style.setProperty('--pie-angle',(fraction*360).toFixed(3)+'deg');
         el('activity-dial').dataset.fraction=String(fraction);
+        el('activity-dial').style.setProperty('--minute-angle',(minute*360).toFixed(3)+'deg');
+        el('activity-dial').dataset.minuteFraction=String(minute);
         el('activity-pie').setAttribute('aria-valuenow',(fraction*60).toFixed(1));
+        el('activity-minute-ring').setAttribute('aria-valuenow',(minute*60).toFixed(1));
       }
       el('stopwatch-time').textContent=T.durationText(T.elapsed(state.stopwatch,now),true);
       glyph(el('stopwatch-toggle'),state.stopwatch.startedAt===null?'play':'pause',state.stopwatch.startedAt===null?'Start stopwatch':'Pause stopwatch');

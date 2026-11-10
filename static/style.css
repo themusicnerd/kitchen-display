@@ -127,15 +127,16 @@ body[data-theme=light][data-paper=true] .time-tools{background:#f8f8f6 url('/ass
 .activity-focus-view{display:flex;flex-direction:column;flex:1;min-height:0;gap:12px}
 .activity-focus-heading{display:flex;gap:16px;align-items:flex-start;flex-shrink:0}.activity-focus-heading>div{flex:1;min-width:0}.activity-focus-heading h3{font-size:28px;overflow-wrap:anywhere}.activity-focus-heading .activity-at{margin-top:8px}
 .activity-dial-space{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden}
-.activity-dial{position:relative;width:var(--dial-size,100%);height:var(--dial-size,100%);max-width:100%;max-height:100%;aspect-ratio:1;container-type:inline-size;--pie-angle:360deg;--pie-fill:color-mix(in srgb,var(--accent) 32%,var(--bg));--pie-track:color-mix(in srgb,var(--muted) 12%,var(--bg))}
-.activity-pie{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--pie-fill) 0deg,var(--pie-fill) var(--pie-angle),var(--pie-track) var(--pie-angle),var(--pie-track) 360deg)}
-.activity-focus-clock{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;pointer-events:none;text-align:center}
-#activity-focus-remaining{font-size:72px;font-weight:550;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.1;max-width:88%}#activity-focus-state{font-size:19px;color:var(--muted);max-width:80%}
-.dial-mark{position:absolute;font-size:18px;font-weight:600;color:var(--muted);pointer-events:none}.dial-mark-top{top:3%;left:50%;transform:translateX(-50%)}.dial-mark-right{top:50%;right:3%;transform:translateY(-50%)}.dial-mark-bottom{bottom:3%;left:50%;transform:translateX(-50%)}.dial-mark-left{top:50%;left:3%;transform:translateY(-50%)}
+.activity-dial{position:relative;width:var(--dial-size,100%);height:var(--dial-size,100%);max-width:100%;max-height:100%;aspect-ratio:1;container-type:inline-size;--pie-angle:360deg;--minute-angle:360deg;--ring-width:clamp(4px,1.8cqi,18px);--ring-gap:clamp(3px,.6cqi,6px);--pie-fill:color-mix(in srgb,var(--accent) 32%,var(--bg));--pie-track:color-mix(in srgb,var(--muted) 12%,var(--bg))}
+.activity-pie{position:absolute;inset:calc(var(--ring-width) + var(--ring-gap));border-radius:50%;background:conic-gradient(from 0deg,var(--pie-fill) 0deg,var(--pie-fill) var(--pie-angle),var(--pie-track) var(--pie-angle),var(--pie-track) 360deg)}
+.activity-minute-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--accent) 0deg,var(--accent) var(--minute-angle),var(--pie-track) var(--minute-angle),var(--pie-track) 360deg);mask:radial-gradient(farthest-side,transparent calc(100% - var(--ring-width)),#000 calc(100% - var(--ring-width) + 1px))}
+.activity-focus-clock{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;text-align:center}
+#activity-focus-remaining{font-size:72px;font-weight:550;font-variant-numeric:tabular-nums;white-space:nowrap;line-height:1.1;max-width:88%}
+.dial-mark{position:absolute;font-size:18px;font-weight:600;color:var(--muted);pointer-events:none;--mark-inset:calc(var(--ring-width) + var(--ring-gap) + 8px)}.dial-mark-top{top:var(--mark-inset);left:50%;transform:translateX(-50%)}.dial-mark-right{top:50%;right:var(--mark-inset);transform:translateY(-50%)}.dial-mark-bottom{bottom:var(--mark-inset);left:50%;transform:translateX(-50%)}.dial-mark-left{top:50%;left:var(--mark-inset);transform:translateY(-50%)}
 @container (min-width:700px){#activity-focus-remaining{font-size:112px}}
 @container (max-width:600px){#activity-focus-remaining{font-size:56px}}
-@container (max-width:400px){#activity-focus-remaining{font-size:40px}#activity-focus-state{font-size:15px}.dial-mark{font-size:14px}}
-@container (max-width:260px){#activity-focus-remaining{font-size:26px}#activity-focus-state{font-size:12px}.dial-mark{font-size:11px}.activity-focus-clock{gap:8px}}
-@container (max-width:180px){#activity-focus-remaining{font-size:18px}#activity-focus-state{font-size:10px}.dial-mark{font-size:8px}.activity-focus-clock{gap:4px}}
-@container (max-width:100px){#activity-focus-remaining{font-size:10px}#activity-focus-state,.dial-mark{display:none}}
+@container (max-width:400px){#activity-focus-remaining{font-size:40px}.dial-mark{font-size:14px}}
+@container (max-width:260px){#activity-focus-remaining{font-size:26px}.dial-mark{font-size:11px}}
+@container (max-width:180px){#activity-focus-remaining{font-size:18px}.dial-mark{font-size:8px}}
+@container (max-width:100px){#activity-focus-remaining{font-size:10px}.dial-mark{display:none}}
 @media(max-width:700px){#close-cameras{top:18px;right:18px}.cameras.expanded{padding-top:84px}.activity-focus-heading h3{font-size:22px}}

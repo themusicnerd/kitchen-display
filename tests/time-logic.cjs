@@ -14,6 +14,18 @@ assert.equal(T.hourFraction(1800000),.5);
 assert.equal(T.hourFraction(900000),.25);
 assert.equal(T.hourFraction(0),0);
 assert.equal(T.hourFraction(-1000),0);
+assert.equal(T.countdownText(1800000),'30:00');
+assert.equal(T.countdownText(7200000),'120:00');
+assert.equal(T.countdownText(100),'00:01');
+assert.equal(T.countdownText(0),'00:00');
+assert.equal(T.countdownText(-1),'00:00');
+assert.equal(T.minuteFraction(1800000),1);
+assert.equal(T.minuteFraction(1830000),.5);
+assert.equal(T.minuteFraction(1815000),.25);
+assert(T.minuteFraction(1800001)<.001);
+assert.equal(T.minuteFraction(60000),1);
+assert.equal(T.minuteFraction(30000),.5);
+assert.equal(T.minuteFraction(0),0);
 const config={timezone:'Australia/Sydney',visualTimers:[
   {id:'a',name:'First',group:'Weekday',enabled:true,days:[1,2,3,4,5],time:'09:00',variant:'any'},
   {id:'b',name:'Second',group:'Weekend',enabled:true,days:[6],time:'10:00',variant:'lunch-out'},
