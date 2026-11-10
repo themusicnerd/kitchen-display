@@ -90,7 +90,12 @@ icon and optional lunch-out/home condition. Select an activity and lunch option 
 Get ready. The display uses the configured timezone and next matching weekday;
 after every timer for that activity has passed, it advances to its next occurrence.
 Progress bars show the final hour. Activity countdowns are visual, not audible
-alarms. School holidays and one-off cancellations are not inferred: disable the
+alarms. Touch an activity countdown to fill the area below the activity controls
+with a large clock over a 60-minute pie countdown. More than an hour stays full;
+the final hour shrinks to empty at the target time. The back arrow or Escape
+returns to all activity timers; the X still closes the whole clock view. Camera
+and clock-view close buttons share the same styling and touch target.
+School holidays and one-off cancellations are not inferred: disable the
 relevant timers when needed. Family routines live only in private settings; new
 installations start with no visual timers. Settings can enable/disable each view.
 

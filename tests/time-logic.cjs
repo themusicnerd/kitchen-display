@@ -7,6 +7,13 @@ assert.equal(T.elapsed({elapsedMs:2000,startedAt:1000},4000),5000);
 assert.equal(T.elapsed({elapsedMs:2000,startedAt:null},4000),2000);
 assert.equal(T.durationText(3661000),'01:01:01');
 assert.equal(T.durationText(1234,true),'00:00:01.23');
+assert.equal(T.hourFraction(7200000),1);
+assert.equal(T.hourFraction(3600000),1);
+assert.equal(T.hourFraction(2700000),.75);
+assert.equal(T.hourFraction(1800000),.5);
+assert.equal(T.hourFraction(900000),.25);
+assert.equal(T.hourFraction(0),0);
+assert.equal(T.hourFraction(-1000),0);
 const config={timezone:'Australia/Sydney',visualTimers:[
   {id:'a',name:'First',group:'Weekday',enabled:true,days:[1,2,3,4,5],time:'09:00',variant:'any'},
   {id:'b',name:'Second',group:'Weekend',enabled:true,days:[6],time:'10:00',variant:'lunch-out'},

@@ -49,6 +49,35 @@ async function until(page,predicate){for(let i=0;i<150;i++){if(await page.evalua
     assert.match(await page.locator('#activity-timers').textContent(),/Home option/);
     await page.locator('[data-lunch=lunch-out]').click();assert.match(await page.locator('#activity-timers').textContent(),/Outing/);assert.doesNotMatch(await page.locator('#activity-timers').textContent(),/Home option/);
     await page.locator('[data-lunch=lunch-in]').click();
+    const closeStyles=await page.evaluate(()=>['close-cameras','close-time-tools'].map(id=>{const button=document.getElementById(id),s=getComputedStyle(button),icon=getComputedStyle(button.querySelector('svg'));return [s.width,s.height,s.border,s.borderRadius,s.backgroundColor,s.color,icon.width,icon.height];}));
+    assert.deepEqual(closeStyles[0],closeStyles[1],'Camera and timer close controls have identical visual styling');
+    await page.locator('.activity-expand').first().click();
+    assert(await page.locator('#activity-focus').isVisible());assert(await page.locator('#activity-timers').isHidden());
+    assert.equal(await page.locator('#activity-focus-title').textContent(),'First activity');
+    await page.evaluate(()=>{window.activityOriginalNow=Date.now;window.focusedTestAt=Number(document.querySelector('.activity-timer').dataset.at);Date.now=()=>window.focusedTestAt-1800000;});
+    await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='0.5');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'00:30:00');
+    assert.equal(await page.locator('#activity-pie').getAttribute('aria-valuenow'),'30.0');
+    assert.equal(await page.locator('#activity-dial').evaluate(el=>el.style.getPropertyValue('--pie-angle')),'180.000deg');
+    for(const [width,height,name] of [[1080,1920,'activity-focus-portrait'],[1440,900,'activity-focus-desktop'],[390,844,'activity-focus-mobile'],[320,720,'activity-focus-small'],[900,540,'activity-focus-landscape']]){
+      await page.setViewportSize({width,height});await page.waitForTimeout(150);
+      const fit=await page.evaluate(()=>{const options=document.querySelector('.activity-options').getBoundingClientRect(),focus=document.getElementById('activity-focus').getBoundingClientRect(),dial=document.getElementById('activity-dial').getBoundingClientRect(),clock=document.getElementById('activity-focus-remaining').getBoundingClientRect();return {below:focus.y>=options.bottom,bottom:Math.abs(focus.bottom-(innerHeight-(innerWidth<=700?18:28)))<2,circle:Math.abs(dial.width-dial.height)<1,size:dial.width,clock:clock.x>=dial.x&&clock.right<=dial.right&&clock.y>=dial.y&&clock.bottom<=dial.bottom,overflow:document.getElementById('time-tools').scrollHeight>document.getElementById('time-tools').clientHeight+1};});
+      assert(fit.below&&fit.bottom&&fit.circle&&fit.size>100&&fit.clock&&!fit.overflow,name+' fits: '+JSON.stringify(fit));
+      await page.screenshot({path:path.join(__dirname,'../test-results/'+name+'.png')});
+    }
+    await settings.locator('#theme').selectOption('dark');await until(page,()=>document.body.dataset.theme==='dark');await page.setViewportSize({width:1080,height:1920});await page.waitForTimeout(800);
+    await page.screenshot({path:path.join(__dirname,'../test-results/activity-focus-dark.png')});
+    await page.evaluate(()=>Date.now=()=>window.focusedTestAt-7200000);await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='1');
+    assert.equal(await page.locator('#activity-focus-state').textContent(),'More than an hour');
+    await page.evaluate(()=>Date.now=()=>window.focusedTestAt+1);await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='0');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'00:00:00');assert.equal(await page.locator('#activity-focus-state').textContent(),'Time reached');
+    await page.evaluate(()=>Date.now=window.activityOriginalNow);
+    await page.locator('#activity-unfocus').click();assert(await page.locator('#activity-timers').isVisible());
+    assert.equal(await page.locator('.activity-expand').first().evaluate(el=>el===document.activeElement),true,'Return restores keyboard focus');
+    await page.locator('.activity-expand').first().focus();await page.keyboard.press('Enter');assert(await page.locator('#activity-focus').isVisible());
+    await page.keyboard.press('Escape');assert(await page.locator('#activity-timers').isVisible());assert(await page.locator('#time-tools').isVisible(),'Escape first returns to all activity timers');
+    await page.locator('.activity-expand').last().click();await page.locator('[data-lunch=lunch-out]').click();assert(await page.locator('#activity-focus').isHidden(),'Changing lunch choice exits a timer no longer included');
+    await page.locator('[data-lunch=lunch-in]').click();await settings.locator('#theme').selectOption('light');
     for(const [width,height,name] of [[1080,1920,'activities-portrait'],[390,844,'activities-mobile'],[320,720,'activities-small']]){
       await page.setViewportSize({width,height});await page.waitForTimeout(800);
       assert.equal(await page.locator('#time-tools').evaluate(el=>el.scrollWidth>el.clientWidth),false,name+' overflow');

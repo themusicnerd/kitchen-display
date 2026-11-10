@@ -1,5 +1,6 @@
 (function(root){
   const MAX_TIMER=100*3600000-1000;
+  function hourFraction(remainingMs){return Math.max(0,Math.min(1,remainingMs/3600000));}
   function remaining(timer,now=Date.now()){
     return Math.max(0,timer.status==='running'?timer.endAt-now:timer.remainingMs);
   }
@@ -37,6 +38,6 @@
     const today=build(0);
     return today.length&&today.every(timer=>timer.at<=now.getTime())?build(1):today;
   }
-  const api={MAX_TIMER,remaining,elapsed,durationText,activityTargets,localParts};
+  const api={MAX_TIMER,hourFraction,remaining,elapsed,durationText,activityTargets,localParts};
   if(typeof module!=='undefined')module.exports=api;else root.KitchenTiming=api;
 })(globalThis);
