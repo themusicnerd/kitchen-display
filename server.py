@@ -39,7 +39,7 @@ SOURCE_CACHE = {}
 DEFAULT = {
     'title': 'Our week', 'timezone': 'Australia/Sydney', 'upcomingWeeks': 3,
     'weekHeight': 640, 'cameraHeight': 230, 'fontWeight': 460,
-    'theme': 'dark', 'showCamera': True, 'cameraFit': 'contain', 'hidePrivateEvents': True,
+    'theme': 'dark', 'paperTexture': True, 'showCamera': True, 'cameraFit': 'contain', 'hidePrivateEvents': True,
     'nightEnabled': True, 'nightStart': '22:00', 'nightEnd': '06:30', 'nightBrightness': 25,
     'calendars': []
 }
@@ -208,13 +208,14 @@ def save_settings(data):
     if data.get('revision') != settings_revision(old):
         raise SettingsConflict('Settings changed elsewhere. Reload this page before saving.')
     conf = {key: data.get(key, old[key]) for key in DEFAULT}
-    conf['title'] = str(conf['title']).strip()[:60] or 'Our week'
+    conf['title'] = str(conf['title']).strip()[:60]
     ZoneInfo(conf['timezone'])
     for key, low, high in [('upcomingWeeks', 1, 4), ('weekHeight', 380, 1000), ('cameraHeight', 140, 480), ('fontWeight', 300, 700)]:
         conf[key] = max(low, min(high, int(conf[key])))
     if conf['theme'] not in ('light', 'dark') or conf['cameraFit'] not in ('contain', 'cover'):
         raise ValueError('Invalid display option.')
     conf['showCamera'] = bool(conf['showCamera'])
+    conf['paperTexture'] = bool(conf['paperTexture'])
     conf['hidePrivateEvents'] = bool(conf['hidePrivateEvents'])
     conf['nightEnabled'] = bool(conf['nightEnabled'])
     conf['nightBrightness'] = max(5, min(100, int(conf['nightBrightness'])))

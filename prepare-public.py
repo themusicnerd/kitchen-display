@@ -14,6 +14,7 @@ FILES = [
     'static/settings.js', 'static/accounts.js', 'static/night-mode.js',
     'static/icons.js', 'static/hls.min.js', 'static/assets/google-sans-flex.ttf',
     'static/assets/OFL.txt', 'static/assets/LUCIDE-LICENSE.txt',
+    'static/assets/paper-texture.png', 'static/assets/PAPER-TEXTURE.md',
     'static/assets/HLS-LICENSE.txt', 'static/assets/GO2RTC-LICENSE.txt',
     'tests/test_calendar.py', 'tests/test_account_settings.py', 'tests/test_oauth.py',
     'tests/test_camera_config.py', 'tests/test_camera_http.py', 'tests/test_night_settings.py',

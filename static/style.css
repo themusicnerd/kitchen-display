@@ -67,6 +67,26 @@ body[data-theme=dark] .primary{color:#241a10}
 @media(max-width:700px){.compact .event-header{display:block}.compact .event-header svg{display:none}.compact .day{padding-left:2px;padding-right:2px}.compact .event{padding-left:2px;padding-right:2px}}
 .camera-refresh{position:absolute;top:8px;right:8px;z-index:2;background:#0009;color:#fff}
 .camera-refresh[aria-busy=true]{color:#efb96d}
+body{isolation:isolate;transition:background-color .7s ease,color .7s ease}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:url('/assets/paper-texture.png') repeat;background-size:640px 640px;opacity:0;transition:opacity .7s ease}
+body[data-theme=light][data-paper=true]{--bg:#f8f8f6;--surface:#ffffff88;--line:#d9dcd8;--ink:#252c2d;--muted:#5d6768;--today:#f9ecd9}
+body[data-theme=light][data-paper=true]::before{opacity:1}
+.week-grid,.day,.event,dialog{transition:background-color .7s ease,color .7s ease,border-color .7s ease}
+body[data-theme=light] dialog{background:#fbfcfa}
+body[data-theme=light] .event-time{color:color-mix(in srgb,var(--event-color) 55%,#182022)}
+.night-controls{display:flex;gap:4px;flex-shrink:0}
+.calendar-filters{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px}
+.calendar-filters .legend{flex:1;min-width:0;margin:0;gap:4px 16px}
+button.legend-item{min-height:44px;max-width:100%;border:0;border-radius:4px;background:transparent;padding:6px 4px;text-align:left;transition:opacity .2s ease}
+button.legend-item>span{overflow-wrap:anywhere;min-width:0}
+button.legend-item[aria-pressed=false]{opacity:.35}
+button.legend-item:hover{background:var(--line)}
+.calendar-bulk{display:flex;flex-shrink:0;gap:4px}
+@media(max-width:700px){.calendar-filters{flex-wrap:wrap;gap:4px}.calendar-filters .legend{flex-basis:100%}.calendar-bulk{margin-left:auto}}
+#night-toggle[aria-pressed=true]{color:var(--accent)}
+#night-toggle[data-manual=true]{background:var(--line)}
+.week-actions{flex-shrink:0}
+@media(max-width:700px){.week-section>.section-heading{flex-wrap:wrap}.week-section>.section-heading>div:first-child{min-width:0;overflow-wrap:anywhere}.week-actions{gap:4px}}
 .night-dimmer{position:fixed;inset:0;z-index:2147483647;background:#000;opacity:0;pointer-events:none;transition:opacity 1.2s linear}
 body[data-night=true] dialog{filter:brightness(var(--night-brightness,25%))}
 .camera-source{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;gap:18px;align-items:end;padding:24px 0;border-top:1px solid var(--line)}
@@ -76,3 +96,4 @@ body[data-night=true] dialog{filter:brightness(var(--night-brightness,25%))}
 .camera-source label:has(.camera-port){grid-column:2}
 .camera-source label:has(.camera-clear-password){grid-column:1/-1}
 @media(max-width:700px){.camera-source{grid-template-columns:minmax(0,1fr) 44px}.camera-source>.checkbox:first-child{grid-column:1/-1}.camera-source label:has(.camera-host),.camera-source label:has(.camera-port),.camera-source label:has(.camera-user),.camera-source label:has(.camera-password){grid-column:1/-1;padding-right:0;min-width:0;justify-self:stretch}.settings-section .section-heading{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){body,body::before,.week-grid,.day,.event,dialog,.night-dimmer,button.legend-item{transition:none}}

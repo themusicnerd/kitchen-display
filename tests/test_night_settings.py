@@ -28,6 +28,16 @@ class NightSettingsTests(unittest.TestCase):
                 server.save_settings(dict(saved, revision=server.settings_revision(saved), nightEnabled=False))
                 self.assertFalse(server.settings()['nightEnabled'])
 
+    def test_heading_can_be_left_blank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory)/'settings.json'
+            config.write_text(json.dumps(copy.deepcopy(server.DEFAULT)))
+            with patch.object(server, 'CONFIG', config), patch.object(server, 'STATE', {'events': []}):
+                original = server.settings()
+                server.save_settings(dict(original, revision=server.settings_revision(original), title='   ', paperTexture=False))
+                self.assertEqual(server.settings()['title'], '')
+                self.assertFalse(server.settings()['paperTexture'])
+
 
 if __name__ == '__main__':
     unittest.main()

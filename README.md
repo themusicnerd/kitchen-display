@@ -59,6 +59,17 @@ Night mode dims the dashboard and expanded cameras with a black overlay; it
 does **not** change the physical monitor backlight or suspend the computer.
 Settings stays at normal brightness so it can always be adjusted.
 
+On the dashboard, the moon/sun button forces night mode on or off immediately.
+The clock button returns to the automatic schedule. Manual overrides use the
+saved dimming level and persist across reloads in that browser until cleared
+with the clock button; they do not change the schedule or other devices.
+
+The sun/moon theme button switches light/dark appearance with a smooth fade,
+independently of brightness. Settings > Layout > Paper texture in light mode
+enables a locally served neutral paper background, or turns it off for a plain
+background. The theme shortcut persists in this browser; changing the default
+Appearance in Settings takes precedence when that change reaches the display.
+
 ## Calendars
 
 Connect multiple Google and Microsoft accounts, select their calendars, then
@@ -72,6 +83,12 @@ Private HTTPS iCalendar feeds are also supported. Private/confidential events
 are hidden by default before reaching the browser, based on provider flags.
 Calendars refresh every five minutes and include 26 upcoming weeks. Swipe the
 Coming up area to browse ahead. Timed events show start and end times.
+
+Touch a calendar name in the display legend to show/hide its events. Hidden
+calendars remain in the legend, faded out; eye/eye-off buttons show or hide all
+enabled calendars. Filters apply to current/upcoming weeks and event details,
+persist in this browser and never disconnect accounts or change provider data.
+The Calendar heading setting can be blank; the week itself remains visible.
 
 ## Security and Data
 

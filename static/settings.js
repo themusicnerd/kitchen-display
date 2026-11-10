@@ -1,8 +1,8 @@
 let config;
 const $=id=>document.getElementById(id);
 const icons=()=>window.lucide?.createIcons();
-const keys=['title','timezone','upcomingWeeks','weekHeight','fontWeight','theme','cameraFit','showCamera','hidePrivateEvents','nightEnabled','nightStart','nightEnd','nightBrightness'];
-const binaryKeys=new Set(['showCamera','hidePrivateEvents','nightEnabled']);
+const keys=['title','timezone','upcomingWeeks','weekHeight','fontWeight','theme','cameraFit','showCamera','hidePrivateEvents','nightEnabled','nightStart','nightEnd','nightBrightness','paperTexture'];
+const binaryKeys=new Set(['showCamera','hidePrivateEvents','nightEnabled','paperTexture']);
 const calendarIcons=[['calendar-days','Calendar'],['user-round','Person'],['users-round','Family'],['briefcase-business','Work'],['house','Home'],['graduation-cap','School'],['heart','Care'],['stethoscope','Medical'],['party-popper','Celebration'],['plane','Travel'],['dumbbell','Exercise'],['music','Music'],['utensils','Meals'],['car','Car'],['baby','Child'],['clapperboard','Production'],['wrench','Maintenance'],['sun','Holiday']];
 let iconTarget;
 function applyRowIcon(row,name){
@@ -44,12 +44,14 @@ function sliders(){for(const id of ['weekHeight','fontWeight','nightBrightness']
 async function load(){
   const response=await fetch('/api/settings');if(!response.ok)throw Error('Unable to load settings');config=await response.json();
   document.body.dataset.theme=config.theme;
+  document.body.dataset.paper=String(config.paperTexture);
   for(const key of keys){if(binaryKeys.has(key))$(key).checked=config[key];else $(key).value=config[key];}
   $('calendar-sources').replaceChildren();config.calendars.forEach(calendarRow);sliders();icons();
 }
 $('settings-form').onsubmit=e=>e.preventDefault();
 for(const id of ['weekHeight','fontWeight','nightBrightness'])$(id).oninput=sliders;
 $('theme').onchange=()=>document.body.dataset.theme=$('theme').value;
+$('paperTexture').onchange=()=>document.body.dataset.paper=String($('paperTexture').checked);
 $('add-calendar').onclick=()=>{calendarRow({id:crypto.randomUUID(),name:'',color:['#d99a62','#d88691','#e3bb6e','#b49ac9'][document.querySelectorAll('.calendar-source').length%4],enabled:true});};
 $('save').onclick=async()=>{
   for(const control of $('settings-form').elements)if(!control.closest('.camera-source')&&!control.reportValidity())return;

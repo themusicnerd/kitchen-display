@@ -2,6 +2,55 @@ let config, calendar = {events: [], sources: []};
 const $ = id => document.getElementById(id);
 const icons = () => window.lucide?.createIcons();
 const element = (tag, cls, text) => { const el = document.createElement(tag); if(cls) el.className=cls; if(text !== undefined) el.textContent=text; return el; };
+const hiddenCalendarsKey='kitchen-hidden-calendars';
+function readHiddenCalendars(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(hiddenCalendarsKey)||'[]');
+    return new Set(Array.isArray(saved)?saved.filter(id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(id)).slice(0,200):[]);
+  }catch{return new Set();}
+}
+let hiddenCalendars=readHiddenCalendars();
+const themeKey='kitchen-theme';
+function readThemeOverride(){
+  try{const saved=JSON.parse(localStorage.getItem(themeKey)||'null');return saved&&['dark','light'].includes(saved.value)?saved:null;}
+  catch{return null;}
+}
+let themeOverride=readThemeOverride();
+const themeToggle=element('button','icon-button');themeToggle.id='theme-toggle';themeToggle.type='button';themeToggle.disabled=true;
+themeToggle.title='Switch to light mode';themeToggle.setAttribute('aria-label',themeToggle.title);
+const themeGlyph=element('i');themeGlyph.dataset.lucide='sun-moon';themeToggle.append(themeGlyph);
+document.querySelector('.night-controls').before(themeToggle);
+function applyTheme(){
+  if(!config)return;
+  if(themeOverride&&themeOverride.base!==config.theme){themeOverride=null;try{localStorage.removeItem(themeKey);}catch{}}
+  const theme=themeOverride?.value||config.theme;
+  document.body.dataset.theme=theme;document.body.dataset.paper=String(config.paperTexture);
+  themeToggle.disabled=false;themeToggle.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';
+  themeToggle.setAttribute('aria-label',themeToggle.title);themeToggle.setAttribute('aria-pressed',String(theme==='light'));
+}
+themeToggle.onclick=()=>{
+  if(!config)return;
+  themeOverride={value:document.body.dataset.theme==='dark'?'light':'dark',base:config.theme};
+  try{localStorage.setItem(themeKey,JSON.stringify(themeOverride));}catch{}
+  applyTheme();
+};
+window.addEventListener('storage',event=>{
+  if(event.key===themeKey||event.key===null){themeOverride=readThemeOverride();applyTheme();}
+});
+function saveHiddenCalendars(){
+  try{localStorage.setItem(hiddenCalendarsKey,JSON.stringify([...hiddenCalendars]));}catch{}
+  render();
+}
+function toggleCalendar(id){
+  if(hiddenCalendars.has(id))hiddenCalendars.delete(id);else hiddenCalendars.add(id);
+  saveHiddenCalendars();
+  Array.from($('legend').children).find(item=>item.dataset.calendarId===id)?.focus({preventScroll:true});
+}
+$('show-calendars').onclick=()=>{if(config){hiddenCalendars.clear();saveHiddenCalendars();}};
+$('hide-calendars').onclick=()=>{if(config){for(const source of config.calendars.filter(s=>s.enabled))hiddenCalendars.add(source.id);saveHiddenCalendars();}};
+window.addEventListener('storage',event=>{
+  if(event.key===hiddenCalendarsKey||event.key===null){hiddenCalendars=readHiddenCalendars();if(config)render();}
+});
 function calendarIcon(sourceId){const icon=element('i');icon.dataset.lucide=config.calendars.find(c=>c.id===sourceId)?.icon||'calendar-days';return icon;}
 function dateKey(value) { return new Intl.DateTimeFormat('en-CA', {timeZone: config.timezone, year:'numeric',month:'2-digit',day:'2-digit'}).format(value); }
 function parseDate(key) { return new Date(`${key}T12:00:00Z`); }
@@ -21,6 +70,7 @@ function clock() {
 function eventsFor(day) {
   const key=dateKey(day);
   return calendar.events.filter(e=> {
+    if(hiddenCalendars.has(e.sourceId))return false;
     if(e.allDay) return e.start<=key && e.end>key;
     const start=dateKey(new Date(e.start)), end=dateKey(new Date(new Date(e.end).getTime()-1));
     return start<=key && end>=key;
@@ -89,22 +139,30 @@ function weekGrid(start, compact=false) {
   return grid;
 }
 function render() {
-  document.body.dataset.theme=config.theme;
+  applyTheme();
   document.documentElement.style.setProperty('--week-height',`${config.weekHeight}px`);
   document.documentElement.style.setProperty('--camera-height',`${config.cameraHeight}px`);
   document.documentElement.style.setProperty('--font-weight',config.fontWeight);
   renderCameras();
   document.documentElement.style.setProperty('--upcoming-height',`${config.upcomingWeeks*213}px`);
   $('title').textContent=config.title;
+  $('title').hidden=!config.title;
   const today=parseDate(dateKey(new Date())), monday=addDays(today,-((today.getUTCDay()+6)%7));
   $('week-range').textContent=`${fmt(monday,{day:'numeric',month:'short'})} – ${fmt(addDays(monday,6),{day:'numeric',month:'short'})}`;
   $('month-label').textContent=fmt(addDays(monday,7),{month:'long',year:'numeric'});
   $('week').replaceWith(Object.assign(weekGrid(monday),{id:'week'}));
   $('legend').replaceChildren();
-  for(const source of config.calendars.filter(s=>s.enabled)) {
-    const item=element('span','legend-item');const glyph=calendarIcon(source.id);glyph.style.color=source.color;
-    item.append(glyph,document.createTextNode(source.name));$('legend').append(item);
+  const enabledSources=config.calendars.filter(s=>s.enabled);
+  for(const source of enabledSources) {
+    const item=element('button','legend-item');item.type='button';item.dataset.calendarId=source.id;
+    const visible=!hiddenCalendars.has(source.id);
+    item.setAttribute('aria-pressed',String(visible));item.title=`${visible?'Hide':'Show'} ${source.name}`;
+    const glyph=calendarIcon(source.id);glyph.style.color=source.color;
+    item.append(glyph,element('span','',source.name));item.onclick=()=>toggleCalendar(source.id);$('legend').append(item);
   }
+  $('show-calendars').disabled=!enabledSources.some(s=>hiddenCalendars.has(s.id));
+  $('hide-calendars').disabled=!enabledSources.some(s=>!hiddenCalendars.has(s.id));
+  document.querySelector('.calendar-filters').hidden=!enabledSources.length;
   const scrollTop=$('upcoming').scrollTop;
   $('upcoming').replaceChildren();
   for(let w=1;w<=26;w++){
@@ -114,11 +172,12 @@ function render() {
     $('upcoming').append(section);
   }
   $('upcoming').scrollTop=scrollTop;
+  updateUpcomingMonth();
   requestAnimationFrame(fitUpcoming);
   const enabled=config.calendars.filter(s=>s.enabled&&s.configured);
   const failed=calendar.sources.filter(s=>s.state!=='ready');
   $('connection-state').textContent=enabled.length ? failed.map(s=>`${s.name}: ${s.state}`).join(' · ') : 'No calendars connected';
-  icons();clock();
+  icons();clock();updateNightMode();
 }
 async function update(){
   try {
@@ -162,7 +221,7 @@ function renderCameras(){
   const desired=new Set(config.showCamera?(config.cameras||[]).map(c=>c.id):[]);
   for(const [id,p] of players){if(!desired.has(id)){p.closed=true;clearTimeout(p.retry);p.hls?.destroy();p.video.pause();p.panel.remove();players.delete(id);}}
   if(!config.showCamera||!config.cameras?.length){closeCameras();return;}
-  for(const camera of config.cameras||[]){
+  for(const [index,camera] of (config.cameras||[]).entries()){
     let p=players.get(camera.id);
     if(!p){
       const panel=element('div','camera offline');panel.dataset.camera=camera.id;
@@ -193,7 +252,8 @@ function renderCameras(){
     p.video.style.objectFit=config.cameraFit;
     p.video.setAttribute('aria-label',camera.name);
     p.refresh.title=`Restart ${camera.name} connection`;p.refresh.setAttribute('aria-label',p.refresh.title);
-    $('cameras').append(p.panel);
+    const slot=$('cameras').children[index+1];
+    if(slot!==p.panel)$('cameras').insertBefore(p.panel,slot||null);
   }
 }
 setInterval(()=>{for(const [id,p] of players){
@@ -212,17 +272,46 @@ $('refresh').onclick=async()=>{
 };
 $('close-details').onclick=()=>$('details').close();
 $('details').onclick=e=>{if(e.target===$('details'))$('details').close();};
-$('upcoming').addEventListener('scroll',()=>{
+function updateUpcomingMonth(){
   const top=$('upcoming').getBoundingClientRect().top;
   const visible=Array.from($('upcoming').children).find(section=>section.getBoundingClientRect().bottom>top+50);
   if(visible)$('month-label').textContent=visible.dataset.month;
-},{passive:true});
+}
+$('upcoming').addEventListener('scroll',updateUpcomingMonth,{passive:true});
 const nightDimmer=element('div','night-dimmer');nightDimmer.setAttribute('aria-hidden','true');document.body.append(nightDimmer);
+const nightModeKey='kitchen-night-mode';
+let nightMode='auto';
+function readNightMode(){
+  try{const saved=localStorage.getItem(nightModeKey);return ['on','off'].includes(saved)?saved:'auto';}
+  catch{return 'auto';}
+}
+nightMode=readNightMode();
+function setNightMode(mode){
+  nightMode=mode;
+  try{localStorage.setItem(nightModeKey,mode);}catch{}
+  updateNightMode();
+}
+$('night-toggle').onclick=()=>{if(config)setNightMode(nightActive(config,new Date(),nightMode)?'off':'on');};
+$('night-auto').onclick=()=>setNightMode('auto');
+window.addEventListener('storage',event=>{
+  if(event.key===nightModeKey||event.key===null){nightMode=readNightMode();updateNightMode();}
+});
 function updateNightMode(){
   if(!config)return;
-  const active=nightActive(config);
+  const active=nightActive(config,new Date(),nightMode);
   document.documentElement.style.setProperty('--night-brightness',`${config.nightBrightness}%`);
   nightDimmer.style.opacity=String(active?1-config.nightBrightness/100:0);
   document.body.dataset.night=String(active);
+  document.body.dataset.nightMode=nightMode;
+  const toggle=$('night-toggle'),automatic=$('night-auto');
+  toggle.disabled=false;
+  const action=active?'Turn night mode off':'Turn night mode on';
+  toggle.title=action;toggle.setAttribute('aria-label',action);toggle.setAttribute('aria-pressed',String(active));
+  toggle.dataset.manual=String(nightMode!=='auto');
+  const glyph=active?'sun':'moon';
+  if(toggle.dataset.glyph!==glyph){const icon=element('i');icon.dataset.lucide=glyph;toggle.replaceChildren(icon);toggle.dataset.glyph=glyph;icons();}
+  automatic.disabled=nightMode==='auto';
+  automatic.title=nightMode==='auto'?'Following night schedule':'Return to automatic night schedule';
+  automatic.setAttribute('aria-label',automatic.title);
 }
 update();setInterval(update,30000);setInterval(()=>{if(config){clock();updateNightMode();}},1000);

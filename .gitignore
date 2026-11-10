@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 test-results/
 *.png
+!static/assets/paper-texture.png
 bin/
 .env
 .env.*
