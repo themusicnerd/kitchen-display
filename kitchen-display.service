@@ -1,0 +1,15 @@
+[Unit]
+Description=Kitchen calendar and camera dashboard
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/kitchen-display
+ExecStart=%h/kitchen-display/.venv/bin/python %h/kitchen-display/server.py --host 0.0.0.0
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

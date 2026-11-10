@@ -1,0 +1,16 @@
+[Unit]
+Description=Local RTSP bridge for kitchen cameras
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/kitchen-display
+ExecStart=%h/kitchen-display/bin/go2rtc -config %h/.config/kitchen-display/go2rtc.yaml
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=default.target
