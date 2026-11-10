@@ -70,12 +70,19 @@ def main():
             shutil.copy2(target, target.with_suffix('.service.before-install'))
         target.write_text(source)
     if args.kiosk:
+        browser_unit = units/'kitchen-display-browser.service'
+        source = (ROOT/'kitchen-display-browser.service').read_text()
+        source = source.replace('WorkingDirectory=%h/kitchen-display', f'WorkingDirectory="{ROOT}"')
+        source = source.replace('%h/kitchen-display', str(ROOT))
+        if browser_unit.exists() and browser_unit.read_text() != source:
+            shutil.copy2(browser_unit, browser_unit.with_suffix('.service.before-install'))
+        browser_unit.write_text(source)
         autostart = Path.home()/'.config/autostart/kitchen-display.desktop'
         autostart.parent.mkdir(parents=True, exist_ok=True)
         if autostart.exists():
             shutil.copy2(autostart, autostart.with_suffix('.desktop.before-install'))
         autostart.write_text('[Desktop Entry]\nType=Application\nName=Kitchen Display\n'
-                             f'Exec=/bin/bash "{ROOT}/start-kiosk.sh"\nX-GNOME-Autostart-enabled=true\n')
+                             'Exec=systemctl --user start kitchen-display-browser.service\nX-GNOME-Autostart-enabled=true\n')
     subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
     subprocess.run(['systemctl', '--user', 'enable', '--now', 'kitchen-cameras.service', 'kitchen-display.service'], check=True)
     subprocess.run(['systemctl', '--user', 'restart', 'kitchen-cameras.service', 'kitchen-display.service'], check=True)

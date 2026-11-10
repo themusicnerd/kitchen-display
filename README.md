@@ -122,6 +122,12 @@ Private HTTPS iCalendar feeds are also supported. Private/confidential events
 are hidden by default before reaching the browser, based on provider flags.
 Calendars refresh every five minutes and include 26 upcoming weeks. Swipe the
 Coming up area to browse ahead. Timed events show start and end times.
+Failed refreshes retry after 15, 30 and then 60 seconds, rather than leaving a
+blank display for five minutes after a network-delayed boot. Last-known events
+are saved privately in `calendar-cache.json` (mode 600) and restored before the
+first network fetch. Cache entries older than seven days or belonging to removed,
+disabled or changed calendar connections are not restored. Privacy filtering is
+applied again when loading cached events. Offline data is labelled as cached.
 
 Touch a calendar name in the display legend to show/hide its events. Hidden
 calendars remain in the legend, faded out; eye/eye-off buttons show or hide all
@@ -133,6 +139,7 @@ The Calendar heading setting can be blank; the week itself remains visible.
 
 Private state is stored outside the checkout in `~/.config/kitchen-display/`:
 `settings.json`, `cameras.json`, `go2rtc.yaml`, OAuth apps/tokens and `lan-password`.
+The private `calendar-cache.json` also contains calendar event data.
 The directory uses mode 700, secret files mode 600. Passwords and provider tokens
 are never returned by settings APIs. Never upload this directory, browser
 profiles, real screenshots, network captures or personalised backups.
@@ -153,12 +160,16 @@ visible to authenticated display users. See [SECURITY.md](SECURITY.md).
 
 ```bash
 systemctl --user restart kitchen-display kitchen-cameras
+systemctl --user restart kitchen-display-browser
 journalctl --user -u kitchen-display -n 50
 systemctl --user disable --now kitchen-display kitchen-cameras
 ```
 
 If installed, disable kiosk startup by renaming
 `~/.config/autostart/kitchen-display.desktop` to `.desktop.disabled`.
+The desktop entry starts the permanent `kitchen-display-browser.service`; it is
+not a second browser launcher. It is triggered at desktop login, not enabled as
+a pre-login system service. Starting it repeatedly does not create extra kiosks.
 Private camera backups are `cameras.before-settings.json` and
 `go2rtc.before-settings.json`. To restore the last setup, stop the services, copy
 these over `cameras.json` and `go2rtc.yaml`, keep mode 600, then restart services.

@@ -12,6 +12,7 @@ bin/
 camera.json
 cameras.json
 settings.json
+calendar-cache.json
 go2rtc.yaml
 oauth-apps.json
 oauth-accounts.json

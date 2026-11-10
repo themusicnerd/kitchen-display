@@ -29,6 +29,8 @@ import camera_config
 ROOT = Path(__file__).resolve().parent
 PRIVATE = Path.home() / '.config/kitchen-display'
 CONFIG = PRIVATE / 'settings.json'
+CACHE = PRIVATE / 'calendar-cache.json'
+CACHE_MAX_AGE = 7 * 86400
 CAMERA = PRIVATE / 'camera.json'
 CAMERAS = PRIVATE / 'cameras.json'
 ACCESS = PRIVATE / 'lan-password'
@@ -151,6 +153,83 @@ def expand_events(raw, source, first, last, timezone, hide_private=True):
     return result
 
 
+def source_identity(source):
+    return source.get('url') or (source.get('accountId', '') + ':' + source.get('calendarId', ''))
+
+
+def persist_calendar_cache(conf):
+    saved = {}
+    with LOCK:
+        previous = {}
+        try:
+            if CACHE.exists() and CACHE.stat().st_size <= 32 * 1024 * 1024:
+                data = json.loads(CACHE.read_text())
+                if isinstance(data, dict) and data.get('version') == 1 and isinstance(data.get('sources'), dict):
+                    previous = data['sources']
+        except (OSError, ValueError):
+            pass
+        for source in conf['calendars']:
+            if not source['enabled']:
+                continue
+            cached = SOURCE_CACHE.get(source['id'])
+            identity = hashlib.sha256(source_identity(source).encode()).hexdigest()
+            if cached and cached[0] == source_identity(source):
+                saved[source['id']] = {'identity': hashlib.sha256(cached[0].encode()).hexdigest(),
+                                       'events': cached[1], 'lastSuccess': cached[2]}
+            else:
+                # Keep a matching snapshot if boot starts before network/time sync.
+                entry = previous.get(source['id'])
+                if (isinstance(entry, dict) and entry.get('identity') == identity and
+                        isinstance(entry.get('lastSuccess'), (int, float)) and
+                        time.time() - entry['lastSuccess'] <= CACHE_MAX_AGE):
+                    saved[source['id']] = entry
+        try:
+            private_json(CACHE, {'version': 1, 'sources': saved})
+        except OSError:
+            logging.warning('Calendar cache could not be saved; live display remains available.')
+
+
+def restore_calendar_cache():
+    if not CACHE.exists():
+        return
+    try:
+        CACHE.chmod(0o600)
+        if CACHE.stat().st_size > 32 * 1024 * 1024:
+            raise ValueError('Cache too large')
+        saved = json.loads(CACHE.read_text())
+        if not isinstance(saved, dict) or saved.get('version') != 1 or not isinstance(saved.get('sources'), dict):
+            return
+        conf = settings()
+        events, statuses = [], []
+        now = time.time()
+        for source in conf['calendars']:
+            if not source['enabled']:
+                continue
+            entry = saved['sources'].get(source['id'])
+            identity = source_identity(source)
+            if not isinstance(entry, dict) or entry.get('identity') != hashlib.sha256(identity.encode()).hexdigest():
+                continue
+            timestamp, items = entry.get('lastSuccess'), entry.get('events')
+            if not isinstance(timestamp, (int, float)) or not -300 <= now - timestamp <= CACHE_MAX_AGE:
+                continue
+            if not isinstance(items, list) or len(items) > 5000 or any(not isinstance(item, dict) or item.get('sourceId') != source['id'] for item in items):
+                continue
+            SOURCE_CACHE[source['id']] = (identity, items, timestamp)
+            events.extend({**item, 'source': source['name'], 'color': source['color']} for item in items
+                          if not (conf['hidePrivateEvents'] and item.get('isPrivate')))
+            statuses.append({'id': source['id'], 'name': source['name'], 'state': 'offline - cached events', 'lastSuccess': timestamp})
+        with LOCK:
+            STATE.update(events=events, sources=statuses, updated=None)
+    except (OSError, ValueError, TypeError, KeyError):
+        logging.warning('Saved calendar cache is unavailable; fetching fresh events.')
+
+
+def calendar_poll_delay(retry_delay=15):
+    with LOCK:
+        failed = any(source['state'] in ('refresh failed', 'offline - cached events') for source in STATE['sources'])
+    return retry_delay if failed else 300
+
+
 def refresh_calendars():
     conf = settings()
     tz = ZoneInfo(conf['timezone'])
@@ -162,7 +241,7 @@ def refresh_calendars():
         if not source['enabled']:
             continue
         status = {'id': source['id'], 'name': source['name'], 'state': 'ready'}
-        identity = source.get('url') or (source.get('accountId', '') + ':' + source.get('calendarId', ''))
+        identity = source_identity(source)
         try:
             if source.get('accountId'):
                 items = accounts.event_window(source, first, last, tz, hide_private=conf['hidePrivateEvents'])
@@ -174,11 +253,12 @@ def refresh_calendars():
                 items = expand_events(fetch_feed(source['url']), source, first, last, tz, hide_private=conf['hidePrivateEvents'])
                 SOURCE_CACHE[source['id']] = (identity, items, time.time())
                 events.extend(items)
-        except Exception:
+        except Exception as exc:
             # Do not log exception strings: provider errors may contain secret feed URLs.
+            logging.warning('Calendar fetch failed (%s); retrying with cached data when available.', type(exc).__name__)
             status['state'] = 'refresh failed'
             cached = SOURCE_CACHE.get(source['id'])
-            if cached and cached[0] == identity:
+            if cached and cached[0] == identity and -300 <= time.time() - cached[2] <= CACHE_MAX_AGE:
                 events.extend([{**item, 'source': source['name'], 'color': source['color']} for item in cached[1]])
                 status['state'] = 'offline - cached events'
                 status['lastSuccess'] = cached[2]
@@ -192,16 +272,23 @@ def refresh_calendars():
         events = [{**e, 'source': active[e['sourceId']]['name'], 'color': active[e['sourceId']]['color']}
                   for e in events if e['sourceId'] in valid and not (current['hidePrivateEvents'] and e.get('isPrivate'))]
         STATE.update(events=events, sources=[s for s in statuses if s['id'] in valid], updated=time.time())
+        persist_calendar_cache(current)
 
 
 def calendar_worker():
+    retry_delay = 15
     while True:
         WAKE.clear()
         try:
+            if not SOURCE_CACHE:
+                restore_calendar_cache()
             refresh_calendars()
+            delay = calendar_poll_delay(retry_delay)
         except Exception:
             logging.error('Calendar refresh failed; previous data retained.')
-        WAKE.wait(300)
+            delay = retry_delay
+        WAKE.wait(delay)
+        retry_delay = min(60, retry_delay * 2) if delay < 300 else 15
 
 
 def save_settings(data):
@@ -536,6 +623,7 @@ def main():
         print('Camera credentials saved privately.')
         return
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+    restore_calendar_cache()
     threading.Thread(target=calendar_worker, daemon=True).start()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     logging.info('Kitchen display listening on %s:%d', args.host, args.port)

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parent
 FILES = [
     'server.py', 'oauth_accounts.py', 'camera_config.py', 'install.py', 'setup-streams.py',
     'start-kiosk.sh', 'kitchen-display.service', 'kitchen-cameras.service',
+    'kitchen-display-browser.service', 'tests/test_calendar_cache.py',
     'configure-kiosk.py', 'kiosk-prefs.js',
     'requirements.txt', 'requirements.lock', '.gitignore', 'ACCOUNT_SETUP.md',
     'SECURITY.md', 'NOTICE.md', 'LICENSE', 'prepare-public.py',

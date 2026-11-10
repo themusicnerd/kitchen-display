@@ -1,0 +1,13 @@
+[Unit]
+Description=Kitchen display Firefox kiosk
+After=graphical-session.target kitchen-display.service
+PartOf=graphical-session.target
+Requires=kitchen-display.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/kitchen-display
+ExecStart=/bin/bash "%h/kitchen-display/start-kiosk.sh"
+Restart=on-failure
+RestartSec=5
+UMask=0077

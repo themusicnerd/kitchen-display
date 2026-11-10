@@ -15,7 +15,7 @@ class InstallTests(unittest.TestCase):
             home = Path(directory)/'home'
             root = home/'checkout with spaces'
             root.mkdir(parents=True)
-            for filename in ('kitchen-display.service', 'kitchen-cameras.service'):
+            for filename in ('kitchen-display.service', 'kitchen-cameras.service', 'kitchen-display-browser.service'):
                 shutil.copy2(install.ROOT/filename, root/filename)
             private = home/'.config/kitchen-display'
             private.mkdir(parents=True)
@@ -41,7 +41,9 @@ class InstallTests(unittest.TestCase):
                 self.assertIn(f'ExecStart="{root}/.venv/bin/python" "{root}/server.py"', service)
                 self.assertNotIn('%h/kitchen-display', service)
                 self.assertEqual((private/'settings.json').read_text(), '{"title":"Keep me"}')
-                self.assertIn(f'Exec=/bin/bash "{root}/start-kiosk.sh"', (home/'.config/autostart/kitchen-display.desktop').read_text())
+                self.assertIn('Exec=systemctl --user start kitchen-display-browser.service', (home/'.config/autostart/kitchen-display.desktop').read_text())
+                browser_unit = (home/'.config/systemd/user/kitchen-display-browser.service').read_text()
+                self.assertIn(f'ExecStart=/bin/bash "{root}/start-kiosk.sh"', browser_unit)
                 self.assertFalse(any('sudo' in str(call) for call in run.call_args_list))
 
 
