@@ -21,13 +21,17 @@ class CastTests(unittest.TestCase):
         self.manager.last_scan = time.time()
         cast = MagicMock()
         controller = MagicMock()
-        controller.load_url.side_effect = lambda url, **kw: kw['callback_function'](True)
+        controller.launch.side_effect = lambda **kw: kw['callback_function'](True)
+        cast.status.app_id = controller.supporting_app_id = 'fixture-app'
         with patch('pychromecast.get_chromecast_from_cast_info', return_value=cast), \
              patch('pychromecast.controllers.dashcast.DashCastController', return_value=controller), \
              patch.object(self.manager, '_origin', return_value='http://192.168.1.2:8090'):
+            controller.load_url.side_effect = lambda *a, **kw: [j.update(lastSeen=time.time()) for j in self.manager.jobs.values()]
             job = self.manager.start({'clientId': 'fixture-client', 'deviceId': 'fixture-screen',
                 'source': {'kind': 'countdown', 'id': 'timer-one'},
                 'timer': {'name': 'Test timer', 'status': 'running', 'remainingMs': 1800000}}, 8090)
+        controller.launch.assert_called_once()
+        self.assertTrue(controller.launch.call_args.kwargs['force_launch'])
         token = controller.load_url.call_args.args[0].split('#')[1]
         return job, token
 
@@ -64,6 +68,13 @@ class CastTests(unittest.TestCase):
         for value in (float('nan'), float('inf'), -1, True, 100*3600000+1):
             with self.assertRaises(C.CastError):
                 C.timer_snapshot(self.conf, {'kind': 'countdown', 'id': 'a'}, {'status': 'running', 'remainingMs': value})
+
+    def test_replacing_screen_revokes_old_link(self):
+        _, previous = self.launch()
+        _, current = self.launch()
+        self.assertIsNone(self.manager.receiver(previous))
+        self.assertIsNotNone(self.manager.receiver(current))
+        self.assertEqual(len(self.manager.jobs), 1)
 
     def test_activity_must_be_configured(self):
         with self.assertRaises(C.CastError):

@@ -180,11 +180,6 @@ class CastManager:
                'timezone': conf['timezone']}
         url = self._origin(info.host, port)+'/cast/timer#'+token
         with self.lock:
-            # Starting another timer on this screen revokes the previous timer link.
-            for previous_id, previous in list(self.jobs.items()):
-                if previous['deviceId'] == job['deviceId']:
-                    self.tokens.pop(previous['tokenHash'], None)
-                    self.jobs.pop(previous_id, None)
             self.jobs[job_id] = job
             self.tokens[digest] = job_id
         try:
@@ -204,18 +199,30 @@ class CastManager:
                 def callback(success, response=None):
                     result.append(success)
                     complete.set()
-                controller.load_url(url, force=True, callback_function=callback)
+                if cast.status.app_id == controller.supporting_app_id:
+                    cast.quit_app(timeout=8)
+                # A previous timer navigated away from DashCast's message bus.
+                # Relaunch its bootstrap before sending another timer URL.
+                controller.launch(force_launch=True, callback_function=callback)
+                if not complete.wait(35) or not result or not result[0]:
+                    raise CastError('The screen did not launch DashCast. Check it is awake and online.')
+                ready_until = time.monotonic()+10
+                while not controller.is_active and time.monotonic() < ready_until:
+                    time.sleep(.1)
+                if not controller.is_active:
+                    raise CastError('DashCast is not ready. Check the screen has internet access.')
+                controller.load_url(url, force=True)
                 # DashCast does not always acknowledge custom messages. An HTTP
                 # receiver poll is stronger evidence than a protocol callback.
-                until = time.monotonic()+30
+                until = time.monotonic()+10
                 while time.monotonic() < until:
                     with self.lock:
                         connected = job['lastSeen'] is not None
-                    if connected or complete.is_set():
+                    if connected:
                         break
-                    complete.wait(.2)
+                    time.sleep(.2)
                 active = getattr(cast.status, 'app_id', None) == controller.supporting_app_id
-                if (result and not result[0]) or not (connected or result or active):
+                if not (connected or active):
                     raise CastError('The screen did not accept the timer. Try refreshing the device list.')
             finally:
                 try:
@@ -233,6 +240,13 @@ class CastManager:
                 self.tokens.pop(digest, None)
                 self.jobs.pop(job_id, None)
             raise CastError('Unable to launch the timer on that screen. Check it is awake and reachable.') from None
+        with self.lock:
+            # Revoke older links only after launch, so their closing receiver
+            # cannot cancel this app launch while the old page is still active.
+            for previous_id, previous in list(self.jobs.items()):
+                if previous_id != job_id and previous['deviceId'] == job['deviceId']:
+                    self.tokens.pop(previous['tokenHash'], None)
+                    self.jobs.pop(previous_id, None)
         return self.public_job(job)
 
     def update(self, body):
