@@ -1,4 +1,5 @@
 Authlib==1.9.5
+casttube==0.2.1
 certifi==2026.10.23
 cffi==2.1.1
 charset-normalizer==3.5.2
@@ -6,7 +7,10 @@ click==8.5.1
 cryptography==50.0.2
 icalendar==7.3.0
 idna==3.20
+ifaddr==0.2.0
 joserfc==1.8.0
+protobuf==7.36.2
+PyChromecast==14.1.1
 pycparser==3.12
 python-dateutil==2.9.0.post0
 recurring-ical-events==3.8.2
@@ -16,3 +20,4 @@ typing_extensions==4.16.0
 tzdata==2026.6
 urllib3==2.8.0
 x-wr-timezone==2.0.1
+zeroconf==0.154.0

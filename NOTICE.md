@@ -11,3 +11,9 @@
 
 The go2rtc executable is downloaded by the installer, not bundled in the source.
 Python dependency versions are in requirements.lock; each retains its own licence.
+
+Google Cast control uses PyChromecast 14.1.1:
+https://github.com/home-assistant-libs/pychromecast
+The published DashCast receiver is launched remotely, not bundled:
+https://github.com/madmod/dashcast
+The TV loads Google's hosted Cast Application Framework at runtime.

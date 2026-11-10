@@ -25,6 +25,7 @@ import recurring_ical_events
 import requests
 import oauth_accounts as accounts
 import camera_config
+import cast_support
 
 ROOT = Path(__file__).resolve().parent
 PRIVATE = Path.home() / '.config/kitchen-display'
@@ -44,6 +45,7 @@ DEFAULT = {
     'theme': 'dark', 'paperTexture': True, 'showCamera': True, 'cameraFit': 'contain', 'hidePrivateEvents': True,
     'nightEnabled': True, 'nightStart': '22:00', 'nightEnd': '06:30', 'nightBrightness': 25,
     'timeToolsEnabled': True, 'visualTimersEnabled': True, 'visualTimers': [],
+    'castEnabled': True, 'castBaseUrl': '', 'castKnownHosts': [],
     'calendars': []
 }
 CALENDAR_ICONS = {'calendar-days', 'user-round', 'users-round', 'briefcase-business', 'house',
@@ -75,6 +77,22 @@ def settings():
 
 def settings_revision(conf):
     return hashlib.sha256(json.dumps(conf, sort_keys=True).encode()).hexdigest()
+
+
+CAST = cast_support.CastManager(settings)
+CAST_ASSETS = {
+    '/cast/timer': ('cast-receiver.html', 'text/html'),
+    '/cast/receiver.js': ('cast-receiver.js', 'text/javascript'),
+    '/cast/receiver.css': ('cast-receiver.css', 'text/css'),
+    '/cast/common.css': ('style.css', 'text/css'),
+    '/cast/time-logic.js': ('time-logic.js', 'text/javascript'),
+    '/assets/google-sans-flex.ttf': ('assets/google-sans-flex.ttf', 'font/ttf'),
+    '/assets/paper-texture.png': ('assets/paper-texture.png', 'image/png'),
+}
+CAST_POLICY = ("default-src 'self'; script-src 'self' https://www.gstatic.com; "
+               "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+               "connect-src 'self' https://www.gstatic.com https://*.googleapis.com https://*.google.com; "
+               "media-src 'none'; frame-ancestors 'none'")
 
 
 def public_settings():
@@ -304,6 +322,7 @@ def save_settings(data):
         raise ValueError('Invalid display option.')
     conf['showCamera'] = bool(conf['showCamera'])
     conf['paperTexture'] = bool(conf['paperTexture'])
+    conf.update(cast_support.validate_options(conf))
     conf['hidePrivateEvents'] = bool(conf['hidePrivateEvents'])
     conf['nightEnabled'] = bool(conf['nightEnabled'])
     conf['nightBrightness'] = max(5, min(100, int(conf['nightBrightness'])))
@@ -446,7 +465,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         return False
 
-    def send(self, body, kind='application/json', status=200, headers=None):
+    def send(self, body, kind='application/json', status=200, headers=None, csp=None):
         if not isinstance(body, bytes):
             body = json.dumps(body).encode()
         self.send_response(status)
@@ -456,13 +475,27 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Content-Security-Policy', "default-src 'self'; img-src 'self' blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'")
+        self.send_header('Content-Security-Policy', csp or "default-src 'self'; img-src 'self' blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'")
         for name, value in (headers or {}).items():
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
+        path = urlsplit(self.path).path
+        if path in CAST_ASSETS or path == '/cast/state':
+            address = ipaddress.ip_address(self.client_address[0])
+            if not (address.is_private or address.is_loopback):
+                return self.send({'error': 'LAN receivers only.'}, status=403)
+            if path == '/cast/state':
+                authorization = self.headers.get('Authorization', '')
+                snapshot = CAST.receiver(authorization[7:] if authorization.startswith('Bearer ') else '')
+                return self.send(snapshot or {'error': 'Timer sharing has ended.'}, status=200 if snapshot else 410)
+            filename, kind = CAST_ASSETS[path]
+            try:
+                return self.send((ROOT/'static'/filename).read_bytes(), kind, csp=CAST_POLICY if path == '/cast/timer' else None)
+            except OSError:
+                return self.send({'error': 'Receiver asset unavailable.'}, status=404)
         if not self.allowed():
             return
         path = urlsplit(self.path).path
@@ -503,6 +536,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send({**STATE, 'events': events})
         if path == '/api/status':
             return self.send({'cameras': public_cameras(), 'now': time.time()})
+        if path == '/api/cast/state':
+            try:
+                return self.send(CAST.status(parse_qs(urlsplit(self.path).query).get('client', [''])[0]))
+            except cast_support.CastError as exc:
+                return self.send({'error': str(exc)}, status=400)
         if path == '/api/stream.m3u8' or path.startswith('/api/hls/'):
             return self.camera_stream(path)
         target = ROOT / 'static' / ('index.html' if path == '/' else 'settings.html' if path == '/settings' else path.lstrip('/'))
@@ -559,6 +597,22 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 <= length <= 131072:
                 raise ValueError('Request too large.')
             body = json.loads(self.rfile.read(length) or '{}')
+            if self.path.startswith('/api/cast/'):
+                try:
+                    action = self.path.rsplit('/', 1)[-1]
+                    if action == 'devices':
+                        return self.send({'devices': CAST.discover(refresh=bool(body.get('refresh')))})
+                    if action == 'start':
+                        return self.send(CAST.start(body, self.server.server_port))
+                    if action == 'update':
+                        return self.send(CAST.update(body))
+                    if action == 'stop':
+                        return self.send(CAST.stop(body))
+                    return self.send({'error': 'Not found'}, status=404)
+                except cast_support.CastError as exc:
+                    return self.send({'error': str(exc)}, status=400)
+                except Exception:
+                    return self.send({'error': 'Cast operation failed. Check the selected screen and LAN connection.'}, status=503)
             if self.path == '/api/cameras':
                 if not ipaddress.ip_address(self.client_address[0]).is_loopback:
                     return self.send({'error': 'Edit camera connections on this display at http://localhost:8090/settings.'}, status=403)

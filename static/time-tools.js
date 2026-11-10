@@ -36,6 +36,9 @@
     el('activity-focus-title').textContent=focusedActivity.name;
     el('activity-focus-at').textContent=new Intl.DateTimeFormat('en-AU',{timeZone:config.timezone,weekday:'long',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date(focusedActivity.at));
     el('activity-pie').setAttribute('aria-label','Final hour until '+focusedActivity.name);
+    activityFocus.querySelector('.cast-source')?.remove();
+    if(window.KitchenCast)el('activity-unfocus').before(KitchenCast.button({kind:'activity',id:focusedActivity.id,at:focusedActivity.at}));
+    window.lucide?.createIcons();
   }
   function focusActivity(target,button){
     activityListScroll=dialog.scrollTop;activityOrigin=button;focusedActivity={...target};
@@ -70,6 +73,7 @@
       const row=document.createElement('article');row.className='timer-row';row.dataset.timer=timer.id;
       row.innerHTML='<div class="timer-row-heading"><input class="timer-name" maxlength="40" aria-label="Timer name"><button class="icon-button timer-remove" type="button" title="Remove timer" aria-label="Remove timer"><i data-lucide="trash-2"></i></button></div><output class="timer-remaining" role="timer"></output><div class="timer-duration"><label>Hours<input class="timer-hours" type="number" min="0" max="99" step="1"></label><label>Minutes<input class="timer-minutes" type="number" min="0" max="59" step="1"></label><label>Seconds<input class="timer-seconds" type="number" min="0" max="59" step="1"></label></div><div class="timer-controls"><button class="icon-button timer-toggle" type="button"></button><button class="icon-button timer-reset" type="button" title="Reset timer" aria-label="Reset timer"><i data-lucide="rotate-ccw"></i></button><button class="icon-button timer-extend" type="button" title="Add one minute" aria-label="Add one minute"><i data-lucide="timer-reset"></i></button><button class="icon-button timer-ack" type="button" title="Dismiss timer alert" aria-label="Dismiss timer alert"><i data-lucide="check"></i></button><span class="timer-state"></span></div>';
       const name=row.querySelector('.timer-name');name.value=timer.name;name.onchange=()=>{timer.name=name.value.trim()||'Timer';save();};
+      if(window.KitchenCast)row.querySelector('.timer-remove').before(KitchenCast.button({kind:'countdown',id:timer.id}));
       const inputs=['hours','minutes','seconds'].map(unit=>row.querySelector('.timer-'+unit));
       const seconds=Math.round(timer.durationMs/1000);[Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].forEach((value,i)=>inputs[i].value=value);
       for(const input of inputs)input.onchange=()=>{
@@ -138,6 +142,7 @@
       const status=document.createElement('p');status.className='activity-state';row.append(heading,at,output,progress,status);list.append(row);
       const expand=document.createElement('button');expand.type='button';expand.className='activity-expand';expand.title='Expand '+target.name;expand.setAttribute('aria-label',expand.title);
       const expandIcon=document.createElement('i');expandIcon.dataset.lucide='expand';expand.append(expandIcon);expand.onclick=()=>focusActivity(target,expand);row.append(expand);
+      if(window.KitchenCast)row.append(KitchenCast.button({kind:'activity',id:target.id,at:target.at}));
     }
     if(!list.children.length){const message=document.createElement('p');message.className='empty-day';message.textContent='No visual timers';list.append(message);}
     window.lucide?.createIcons();
@@ -193,5 +198,14 @@
   el('activity-group').onchange=()=>{group=el('activity-group').value;renderActivities();tick();};
   for(const button of el('lunch-options').querySelectorAll('button'))button.onclick=()=>{variant=button.dataset.lunch;try{localStorage.setItem('kitchen-activity-lunch',variant);}catch{}renderActivities();tick();};
   renderTimers();renderLaps();setInterval(tick,100);setInterval(()=>{if(config)refreshOptions();},1000);
-  window.KitchenTimeTools={open,refreshOptions};
+  function castSnapshot(source){
+    if(!config)return null;
+    if(source.kind==='countdown'){
+      const timer=state.timers.find(t=>t.id===source.id);
+      return timer&&config.timeToolsEnabled!==false?{name:timer.name,status:timer.status,endAt:timer.endAt,remainingMs:T.remaining(timer)}:null;
+    }
+    const timer=(config.visualTimers||[]).find(t=>t.id===source.id&&t.enabled);
+    return timer&&config.visualTimersEnabled!==false?{name:timer.name,status:'running',endAt:source.at,remainingMs:Math.max(0,source.at-Date.now())}:null;
+  }
+  window.KitchenTimeTools={open,refreshOptions,castSnapshot};
 })();

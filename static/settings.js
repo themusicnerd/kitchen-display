@@ -2,7 +2,8 @@ let config;
 const $=id=>document.getElementById(id);
 const icons=()=>window.lucide?.createIcons();
 const keys=['title','timezone','upcomingWeeks','weekHeight','fontWeight','theme','cameraFit','showCamera','hidePrivateEvents','nightEnabled','nightStart','nightEnd','nightBrightness','paperTexture','timeToolsEnabled','visualTimersEnabled'];
-const binaryKeys=new Set(['showCamera','hidePrivateEvents','nightEnabled','paperTexture','timeToolsEnabled','visualTimersEnabled']);
+const binaryKeys=new Set(['showCamera','hidePrivateEvents','nightEnabled','paperTexture','timeToolsEnabled','visualTimersEnabled','castEnabled']);
+keys.push('castEnabled','castBaseUrl');
 const calendarIcons=[['calendar-days','Calendar'],['user-round','Person'],['users-round','Family'],['briefcase-business','Work'],['house','Home'],['graduation-cap','School'],['heart','Care'],['stethoscope','Medical'],['party-popper','Celebration'],['plane','Travel'],['dumbbell','Exercise'],['music','Music'],['utensils','Meals'],['car','Car'],['baby','Child'],['clapperboard','Production'],['wrench','Maintenance'],['sun','Holiday']];
 function visualTimerRow(timer){
   const row=document.createElement('details');row.className='visual-setting';row.dataset.id=timer.id;
@@ -61,8 +62,9 @@ function calendarRow(source){
 function sliders(){for(const id of ['weekHeight','fontWeight','nightBrightness'])$(id+'-value').textContent=$(id).value+(id==='fontWeight'?'':id==='nightBrightness'?'%':' px');}
 async function load(){
   const response=await fetch('/api/settings');if(!response.ok)throw Error('Unable to load settings');config=await response.json();
-  for(const key of keys){if(binaryKeys.has(key))$(key).checked=config[key];else $(key).value=config[key];}
+  for(const key of keys){if(binaryKeys.has(key))$(key).checked=config[key]??(key==='castEnabled');else $(key).value=config[key]??'';}
   $('theme').value=KitchenAppearance.apply(config);
+  $('castKnownHosts').value=(config.castKnownHosts||[]).join(', ');
   $('visual-timer-settings').replaceChildren();(config.visualTimers||[]).forEach(visualTimerRow);
   $('calendar-sources').replaceChildren();config.calendars.forEach(calendarRow);sliders();icons();
 }
@@ -77,6 +79,7 @@ $('add-calendar').onclick=()=>{calendarRow({id:crypto.randomUUID(),name:'',color
 $('save').onclick=async()=>{
   for(const control of $('settings-form').elements)if(!control.closest('.camera-source')&&!control.reportValidity())return;
   const payload={revision:config.revision};for(const key of keys)payload[key]=binaryKeys.has(key)?$(key).checked:$(key).value;
+  payload.castKnownHosts=$('castKnownHosts').value.split(/[\s,]+/).filter(Boolean);
   payload.visualTimers=Array.from(document.querySelectorAll('.visual-setting')).map(row=>({id:row.dataset.id,name:row.querySelector('.visual-name').value,group:row.querySelector('.visual-group').value,time:row.querySelector('.visual-time').value,enabled:row.querySelector('.visual-enabled').checked,variant:row.querySelector('.visual-variant').value,icon:row.querySelector('.visual-icon').value,days:Array.from(row.querySelectorAll('.visual-day:checked')).map(input=>Number(input.value))}));
   if(payload.visualTimers.some(timer=>!timer.days.length)){$('save-status').textContent='Choose at least one weekday for each visual timer.';return;}
   payload.calendars=Array.from(document.querySelectorAll('.calendar-source')).map(row=>({id:row.dataset.id,name:row.querySelector('.name').value,color:row.querySelector('.color').value,icon:row.dataset.icon,enabled:row.querySelector('.enabled').checked,url:row.querySelector('.feed').value,configured:row.dataset.configured==='true',accountId:row.dataset.accountId,calendarId:row.dataset.calendarId}));

@@ -29,6 +29,41 @@ login, sleep settings, firewall rules, camera firmware or camera encoding.
 Open **http://localhost:8090/settings** on the display. The dashboard is at
 http://localhost:8090/. Services start at user login, not before a login session.
 
+## Cast Timers
+
+Each countdown and Get Ready timer has a Cast icon, including the expanded visual
+countdown. Touch it, choose a discovered screen, then press Cast. Merely opening
+the picker does not interrupt a TV. The receiver uses a landscape layout with the
+timer name beside a large hour pie and seconds ring. Pause, resume, reset and
+duration changes synchronise while the sending dashboard is open. Closing the
+picker does not stop sharing; its square stop button revokes the selected session.
+Stopwatch casting is not included.
+
+Settings > Google Cast can disable casting, set an optional reachable LAN server
+origin, or add private device IPs when multicast discovery needs help. Audio-only
+speakers/groups are excluded. The TV and server must be reachable on the trusted
+LAN, including server TCP port 8090 and Cast control TCP port 8009. Client/AP
+isolation can block discovery or loading. Discovery is not AirPlay or Miracast.
+
+Casting works from the Firefox kiosk via PyChromecast, not a browser Cast SDK.
+It launches the published third-party DashCast receiver (app ID 84912283), then
+loads a local dedicated timer page. TV internet access is needed for DashCast and
+Google's Cast receiver framework. This avoids registering your own receiver but
+depends on that external app continuing to be available. Device firmware may
+affect compatibility; there is no video-transcoding fallback. The receiver has
+been tested on a Google Nest Hub; built-in TV receiver compatibility can vary.
+
+A short-lived, revocable random link grants access to **one timer only**, never
+calendar accounts, events, cameras or Settings. It is sent as a URL fragment and
+used as a bearer token; keep it private. Generic receiver assets are available
+without Basic auth on the LAN so a TV can load them. Timer sessions are held only
+in server memory and end on server restart, disabling casting, explicit stop or
+expiry (15 minutes after a running countdown ends, with an eight-day maximum).
+Idle/paused sessions expire after at least ten minutes unless already granted a
+longer running deadline; keep the dashboard open for timer control. Stop revokes
+the timer page; it does not issue a global command that could stop another app
+you subsequently opened on the TV. It does not resume previous TV content.
+
 ## Cameras
 
 In Settings > Cameras, add up to four cameras. Each has a name, enabled switch,
