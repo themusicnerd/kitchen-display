@@ -8,10 +8,12 @@ ROOT = Path(__file__).resolve().parent
 FILES = [
     'server.py', 'oauth_accounts.py', 'camera_config.py', 'install.py', 'setup-streams.py',
     'start-kiosk.sh', 'kitchen-display.service', 'kitchen-cameras.service',
+    'configure-kiosk.py', 'kiosk-prefs.js',
     'requirements.txt', 'requirements.lock', '.gitignore', 'ACCOUNT_SETUP.md',
     'SECURITY.md', 'NOTICE.md', 'LICENSE', 'prepare-public.py',
     'static/index.html', 'static/settings.html', 'static/style.css', 'static/app.js',
     'static/settings.js', 'static/accounts.js', 'static/night-mode.js',
+    'static/appearance.js', 'static/time-logic.js', 'static/time-tools.js',
     'static/icons.js', 'static/hls.min.js', 'static/assets/google-sans-flex.ttf',
     'static/assets/OFL.txt', 'static/assets/LUCIDE-LICENSE.txt',
     'static/assets/paper-texture.png', 'static/assets/PAPER-TEXTURE.md',
@@ -19,6 +21,8 @@ FILES = [
     'tests/test_calendar.py', 'tests/test_account_settings.py', 'tests/test_oauth.py',
     'tests/test_camera_config.py', 'tests/test_camera_http.py', 'tests/test_night_settings.py',
     'tests/night-mode.cjs', 'tests/settings-browser.cjs', 'tests/test_install.py',
+    'tests/time-logic.cjs', 'tests/time-tools-browser.cjs', 'tests/test_visual_timers.py',
+    'tests/test_kiosk.py',
 ]
 
 

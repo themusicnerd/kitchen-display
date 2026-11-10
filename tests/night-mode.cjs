@@ -1,5 +1,6 @@
 const assert=require('node:assert/strict');
 const {nightActive}=require('../static/night-mode.js');
+const {nextNightBoundary,makeNightOverride,overrideMode}=require('../static/night-mode.js');
 const config={nightEnabled:true,timezone:'Australia/Sydney',nightStart:'22:00',nightEnd:'06:30'};
 for(const [time,expected] of [['21:59',false],['22:00',true],['23:59',true],['00:00',true],['06:29',true],['06:30',false],['12:00',false]]){
   assert.equal(nightActive(config,new Date(`2026-11-10T${time}:00+11:00`)),expected,time);
@@ -16,3 +17,18 @@ assert.equal(nightActive(config,new Date('2026-11-10T23:00:00+11:00'),'off'),fal
 assert.equal(nightActive(config,new Date('2026-11-10T23:00:00+11:00'),'auto'),true,'Automatic resumes schedule');
 assert.equal(nightActive(config,new Date('2026-11-10T12:00:00+11:00'),'invalid'),false,'Invalid mode falls back to schedule');
 console.log('PASS: overnight/daytime boundaries, explicit PM end, disabled mode, timezone/DST and manual overrides');
+const at=value=>new Date('2026-11-10T'+value+':00+11:00');
+assert.equal(nextNightBoundary(config,at('23:00')),new Date('2026-11-11T06:30:00+11:00').getTime());
+const forceOff=makeNightOverride(config,'off',at('23:00'));
+assert.equal(overrideMode(config,forceOff,new Date('2026-11-11T06:29:59+11:00')),'off');
+assert.equal(overrideMode(config,forceOff,new Date('2026-11-11T06:30:00+11:00')),'auto');
+const forceOn=makeNightOverride(config,'on',at('12:00'));
+assert.equal(forceOn.expiresAt,at('22:00').getTime());
+assert.equal(overrideMode(config,forceOn,at('22:00')),'auto');
+assert.equal(overrideMode({...config,nightEnd:'07:00'},forceOn,at('12:30')),'auto','Schedule edits invalidate override');
+assert.equal(nextNightBoundary({...config,nightEnabled:false},at('12:00')),null);
+const winter=nextNightBoundary(config,new Date('2026-07-10T23:00:00+10:00'));
+assert.equal(winter,new Date('2026-07-11T06:30:00+10:00').getTime());
+const skipped=nextNightBoundary({...config,nightStart:'02:30',nightEnd:'06:30'},new Date('2026-10-04T01:59:00+10:00'));
+assert.equal(skipped,new Date('2026-10-04T03:00:00+11:00').getTime(),'Skipped DST time changes state at jump');
+console.log('PASS: manual override expiry at next schedule boundary, reload-safe timestamps and schedule changes');

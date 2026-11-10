@@ -23,7 +23,7 @@ async function expectPaperOpacity(page,expected){
   const browser=await chromium.launchPersistentContext(profile,options);
   const base=process.env.TEST_URL||'http://127.0.0.1:8090';
   fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});
-  const config={revision:'fixture',title:'Family calendar',timezone:'Australia/Sydney',upcomingWeeks:3,weekHeight:640,fontWeight:460,cameraHeight:230,theme:'dark',paperTexture:true,cameraFit:'contain',showCamera:true,hidePrivateEvents:true,nightEnabled:true,nightStart:'22:00',nightEnd:'18:30',nightBrightness:25,calendars:[],cameras:[]};
+  const config={revision:'fixture',title:'Family calendar',timezone:'Australia/Sydney',upcomingWeeks:3,weekHeight:640,fontWeight:460,cameraHeight:230,theme:'dark',paperTexture:true,cameraFit:'contain',showCamera:true,hidePrivateEvents:true,nightEnabled:true,nightStart:'22:00',nightEnd:'18:30',nightBrightness:25,timeToolsEnabled:true,visualTimersEnabled:true,visualTimers:[],calendars:[],cameras:[]};
   let cameraPayload;
   let fixtureEvents=[];
   let cameraState={revision:'camera-fixture',cameras:[{id:'example',name:'Front camera',host:'camera.example',port:554,path:'/Streaming/Channels/102',enabled:true,username:'viewer',hasPassword:true,pathConfigured:true}]};
@@ -83,7 +83,7 @@ async function expectPaperOpacity(page,expected){
     const dayKey=offset=>{const date=new Date(today+'T12:00:00Z');date.setUTCDate(date.getUTCDate()+offset);return date.toISOString().slice(0,10);};
     fixtureEvents=config.calendars.flatMap(source=>[0,7].map(offset=>({id:source.id+offset,sourceId:source.id,source:source.name,color:source.color,title:source.name+(offset?' next week':' today'),allDay:true,start:dayKey(offset),end:dayKey(offset+1)})));
     await page.goto(base+'/');await waitUntil(page,()=>document.getElementById('clock').textContent.length>0);
-    await page.evaluate(()=>{localStorage.removeItem('kitchen-hidden-calendars');localStorage.removeItem('kitchen-theme');hiddenCalendars=readHiddenCalendars();themeOverride=null;render();});
+    await page.evaluate(()=>{localStorage.removeItem('kitchen-hidden-calendars');localStorage.removeItem('kitchen-theme');hiddenCalendars=readHiddenCalendars();render();});
     assert.equal(await page.locator('#week .event').count(),2);
     assert.equal(await page.locator('#upcoming .event').count(),2);
     await page.locator('[data-calendar-id=family]').click();await page.waitForTimeout(250);
@@ -138,14 +138,16 @@ async function expectPaperOpacity(page,expected){
     assert.equal(Number(await page.locator('.night-dimmer').evaluate(el=>getComputedStyle(el).opacity)),.75);
     await page.evaluate(()=>{config.nightEnabled=false;updateNightMode();});await page.waitForTimeout(1400);
     assert.equal(Number(await page.locator('.night-dimmer').evaluate(el=>getComputedStyle(el).opacity)),0);
+    config.nightEnabled=false;config.nightStart='00:00';config.nightEnd='23:59';
     await page.locator('#night-toggle').click();await page.waitForTimeout(1400);
     assert.equal(await page.locator('body').getAttribute('data-night-mode'),'on','Force on overrides a disabled schedule');
     assert.equal(Number(await page.locator('.night-dimmer').evaluate(el=>getComputedStyle(el).opacity)),.75);
     assert.equal(await page.locator('#night-toggle').getAttribute('aria-label'),'Turn night mode off');
     await page.reload();await waitUntil(page,()=>document.body.dataset.nightMode==='on');
-    assert.equal(await page.evaluate(()=>localStorage.getItem('kitchen-night-mode')),'on','Override survives reload');
-    await page.locator('#night-toggle').click();
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('kitchen-night-mode')).mode),'on','Override survives reload');
+    config.nightEnabled=true;config.nightStart='00:00';config.nightEnd='23:59';
     await page.evaluate(()=>{config.nightEnabled=true;config.nightStart='00:00';config.nightEnd='23:59';updateNightMode();});
+    await page.locator('#night-toggle').click();
     await page.waitForTimeout(1400);
     assert.equal(await page.locator('body').getAttribute('data-night'),'false','Force off beats scheduled night');
     assert.equal(await page.locator('body').getAttribute('data-night-mode'),'off');

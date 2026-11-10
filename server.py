@@ -41,6 +41,7 @@ DEFAULT = {
     'weekHeight': 640, 'cameraHeight': 230, 'fontWeight': 460,
     'theme': 'dark', 'paperTexture': True, 'showCamera': True, 'cameraFit': 'contain', 'hidePrivateEvents': True,
     'nightEnabled': True, 'nightStart': '22:00', 'nightEnd': '06:30', 'nightBrightness': 25,
+    'timeToolsEnabled': True, 'visualTimersEnabled': True, 'visualTimers': [],
     'calendars': []
 }
 CALENDAR_ICONS = {'calendar-days', 'user-round', 'users-round', 'briefcase-business', 'house',
@@ -222,6 +223,32 @@ def save_settings(data):
     for key in ('nightStart', 'nightEnd'):
         if not isinstance(conf[key], str) or not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', conf[key]):
             raise ValueError('Night mode needs valid start and end times.')
+    conf['timeToolsEnabled'] = bool(conf['timeToolsEnabled'])
+    conf['visualTimersEnabled'] = bool(conf['visualTimersEnabled'])
+    if not isinstance(conf['visualTimers'], list) or len(conf['visualTimers']) > 32:
+        raise ValueError('Maximum 32 visual timers.')
+    timer_ids = set()
+    timers = []
+    for item in conf['visualTimers']:
+        timer_id = str(item.get('id', ''))
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', timer_id) or timer_id in timer_ids:
+            raise ValueError('Invalid visual timer ID.')
+        timer_ids.add(timer_id)
+        at = item.get('time', '')
+        if not isinstance(at, str) or not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]', at):
+            raise ValueError('Invalid visual timer time.')
+        days = item.get('days', [])
+        if not isinstance(days, list) or not days or any(type(day) is not int or day not in range(7) for day in days):
+            raise ValueError('Choose weekdays for each visual timer.')
+        variant = item.get('variant', 'any')
+        icon = item.get('icon', 'clock')
+        if variant not in ('any', 'lunch-out', 'lunch-in') or icon not in {'backpack', 'bell', 'car', 'utensils', 'waves', 'clock', 'music', 'dumbbell', 'calendar-days', 'flag'}:
+            raise ValueError('Invalid visual timer option.')
+        timers.append({'id': timer_id, 'name': str(item.get('name', '')).strip()[:60] or 'Timer',
+                       'group': str(item.get('group', '')).strip()[:40] or 'Activities',
+                       'time': at, 'days': sorted(set(days)), 'variant': variant, 'icon': icon,
+                       'enabled': bool(item.get('enabled', True))})
+    conf['visualTimers'] = timers
     if conf['nightEnabled'] and conf['nightStart'] == conf['nightEnd']:
         raise ValueError('Night mode start and end must differ.')
     existing = {s['id']: s for s in old['calendars']}
@@ -481,7 +508,7 @@ class Handler(BaseHTTPRequestHandler):
         except SettingsConflict as exc:
             return self.send({'error': str(exc)}, status=409)
         except (ValueError, TypeError, KeyError, OSError, StopIteration):
-            return self.send({'error': 'Settings could not be saved. Check the timezone, colours and HTTPS feed addresses.'}, status=400)
+            return self.send({'error': 'Settings could not be saved. Check the timezone, times, weekdays, colours and HTTPS feed addresses.'}, status=400)
         except Exception:
             return self.send({'error': 'Account operation failed. Check the provider setup, sign in again, and retry.'}, status=400)
 

@@ -10,32 +10,26 @@ function readHiddenCalendars(){
   }catch{return new Set();}
 }
 let hiddenCalendars=readHiddenCalendars();
-const themeKey='kitchen-theme';
-function readThemeOverride(){
-  try{const saved=JSON.parse(localStorage.getItem(themeKey)||'null');return saved&&['dark','light'].includes(saved.value)?saved:null;}
-  catch{return null;}
-}
-let themeOverride=readThemeOverride();
+const themeKey=KitchenAppearance.key;
 const themeToggle=element('button','icon-button');themeToggle.id='theme-toggle';themeToggle.type='button';themeToggle.disabled=true;
 themeToggle.title='Switch to light mode';themeToggle.setAttribute('aria-label',themeToggle.title);
 const themeGlyph=element('i');themeGlyph.dataset.lucide='sun-moon';themeToggle.append(themeGlyph);
 document.querySelector('.night-controls').before(themeToggle);
 function applyTheme(){
   if(!config)return;
-  if(themeOverride&&themeOverride.base!==config.theme){themeOverride=null;try{localStorage.removeItem(themeKey);}catch{}}
-  const theme=themeOverride?.value||config.theme;
-  document.body.dataset.theme=theme;document.body.dataset.paper=String(config.paperTexture);
+  const theme=KitchenAppearance.apply(config);
   themeToggle.disabled=false;themeToggle.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';
   themeToggle.setAttribute('aria-label',themeToggle.title);themeToggle.setAttribute('aria-pressed',String(theme==='light'));
 }
 themeToggle.onclick=()=>{
   if(!config)return;
-  themeOverride={value:document.body.dataset.theme==='dark'?'light':'dark',base:config.theme};
-  try{localStorage.setItem(themeKey,JSON.stringify(themeOverride));}catch{}
-  applyTheme();
+  const theme=document.body.dataset.theme==='dark'?'light':'dark';
+  KitchenAppearance.set(config,theme);
+  themeToggle.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';
+  themeToggle.setAttribute('aria-label',themeToggle.title);themeToggle.setAttribute('aria-pressed',String(theme==='light'));
 };
 window.addEventListener('storage',event=>{
-  if(event.key===themeKey||event.key===null){themeOverride=readThemeOverride();applyTheme();}
+  if(event.key===themeKey||event.key===null)applyTheme();
 });
 function saveHiddenCalendars(){
   try{localStorage.setItem(hiddenCalendarsKey,JSON.stringify([...hiddenCalendars]));}catch{}
@@ -282,22 +276,31 @@ const nightDimmer=element('div','night-dimmer');nightDimmer.setAttribute('aria-h
 const nightModeKey='kitchen-night-mode';
 let nightMode='auto';
 function readNightMode(){
-  try{const saved=localStorage.getItem(nightModeKey);return ['on','off'].includes(saved)?saved:'auto';}
-  catch{return 'auto';}
+  try{
+    const raw=localStorage.getItem(nightModeKey);
+    if(['on','off'].includes(raw))return {mode:raw,legacy:true};
+    const saved=JSON.parse(raw||'null');return saved&&['on','off'].includes(saved.mode)?saved:null;
+  }catch{return null;}
 }
-nightMode=readNightMode();
+let nightOverride=readNightMode();
+function storeNightOverride(){
+  try{if(nightOverride)localStorage.setItem(nightModeKey,JSON.stringify(nightOverride));else localStorage.removeItem(nightModeKey);}catch{}
+}
 function setNightMode(mode){
-  nightMode=mode;
-  try{localStorage.setItem(nightModeKey,mode);}catch{}
+  nightOverride=mode==='auto'?null:makeNightOverride(config,mode);
+  storeNightOverride();
   updateNightMode();
 }
-$('night-toggle').onclick=()=>{if(config)setNightMode(nightActive(config,new Date(),nightMode)?'off':'on');};
+$('night-toggle').onclick=()=>{if(config){updateNightMode();setNightMode(nightActive(config,new Date(),nightMode)?'off':'on');}};
 $('night-auto').onclick=()=>setNightMode('auto');
 window.addEventListener('storage',event=>{
-  if(event.key===nightModeKey||event.key===null){nightMode=readNightMode();updateNightMode();}
+  if(event.key===nightModeKey||event.key===null){nightOverride=readNightMode();updateNightMode();}
 });
 function updateNightMode(){
   if(!config)return;
+  if(nightOverride?.legacy){nightOverride=makeNightOverride(config,nightOverride.mode);storeNightOverride();}
+  nightMode=overrideMode(config,nightOverride);
+  if(nightOverride&&nightMode==='auto'){nightOverride=null;storeNightOverride();}
   const active=nightActive(config,new Date(),nightMode);
   document.documentElement.style.setProperty('--night-brightness',`${config.nightBrightness}%`);
   nightDimmer.style.opacity=String(active?1-config.nightBrightness/100:0);

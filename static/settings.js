@@ -1,9 +1,27 @@
 let config;
 const $=id=>document.getElementById(id);
 const icons=()=>window.lucide?.createIcons();
-const keys=['title','timezone','upcomingWeeks','weekHeight','fontWeight','theme','cameraFit','showCamera','hidePrivateEvents','nightEnabled','nightStart','nightEnd','nightBrightness','paperTexture'];
-const binaryKeys=new Set(['showCamera','hidePrivateEvents','nightEnabled','paperTexture']);
+const keys=['title','timezone','upcomingWeeks','weekHeight','fontWeight','theme','cameraFit','showCamera','hidePrivateEvents','nightEnabled','nightStart','nightEnd','nightBrightness','paperTexture','timeToolsEnabled','visualTimersEnabled'];
+const binaryKeys=new Set(['showCamera','hidePrivateEvents','nightEnabled','paperTexture','timeToolsEnabled','visualTimersEnabled']);
 const calendarIcons=[['calendar-days','Calendar'],['user-round','Person'],['users-round','Family'],['briefcase-business','Work'],['house','Home'],['graduation-cap','School'],['heart','Care'],['stethoscope','Medical'],['party-popper','Celebration'],['plane','Travel'],['dumbbell','Exercise'],['music','Music'],['utensils','Meals'],['car','Car'],['baby','Child'],['clapperboard','Production'],['wrench','Maintenance'],['sun','Holiday']];
+function visualTimerRow(timer){
+  const row=document.createElement('details');row.className='visual-setting';row.dataset.id=timer.id;
+  const summary=document.createElement('summary');row.append(summary);
+  const fields=document.createElement('div');fields.className='form-grid';
+  fields.innerHTML='<label class="checkbox"><input class="visual-enabled" type="checkbox">Enabled</label><button type="button" class="icon-button visual-remove" title="Remove visual timer" aria-label="Remove visual timer"><i data-lucide="trash-2"></i></button><label>Name<input class="visual-name" maxlength="60" required></label><label>Activity<input class="visual-group" maxlength="40" required></label><label>Time<input class="visual-time" type="time" required></label><label>Lunch option<select class="visual-variant"><option value="any">Always</option><option value="lunch-out">Lunch out</option><option value="lunch-in">Lunch at home</option></select></label><label>Icon<select class="visual-icon"><option value="clock">Clock</option><option value="backpack">Backpack</option><option value="bell">Bell</option><option value="car">Car</option><option value="utensils">Meal</option><option value="waves">Swimming</option><option value="music">Music</option><option value="dumbbell">Sport</option><option value="calendar-days">Calendar</option><option value="flag">Flag</option></select></label><fieldset class="visual-days"><legend>Weekdays</legend></fieldset>';
+  for(const key of ['name','group','time','variant','icon'])fields.querySelector('.visual-'+key).value=timer[key]||({variant:'any',icon:'clock'}[key]||'');
+  fields.querySelector('.visual-enabled').checked=timer.enabled!==false;
+  for(const [day,name] of [[1,'Mon'],[2,'Tue'],[3,'Wed'],[4,'Thu'],[5,'Fri'],[6,'Sat'],[0,'Sun']]){
+    const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.className='visual-day';input.value=day;input.checked=(timer.days||[]).includes(day);label.append(input,document.createTextNode(name));fields.querySelector('.visual-days').append(label);
+  }
+  const updateSummary=()=>{summary.textContent=`${fields.querySelector('.visual-name').value||'Timer'} · ${fields.querySelector('.visual-time').value||'--:--'}`;row.dataset.enabled=String(fields.querySelector('.visual-enabled').checked);};
+  fields.addEventListener('input',updateSummary);fields.querySelector('.visual-remove').onclick=()=>row.remove();
+  row.append(fields);$('visual-timer-settings').append(row);updateSummary();icons();return row;
+}
+$('add-visual-timer').onclick=()=>{
+  if(document.querySelectorAll('.visual-setting').length>=32){$('save-status').textContent='Maximum 32 visual timers.';return;}
+  const row=visualTimerRow({id:crypto.randomUUID(),name:'New timer',group:'Activities',time:'09:00',days:[1,2,3,4,5],enabled:true,variant:'any',icon:'clock'});row.open=true;row.querySelector('.visual-name').focus();
+};
 let iconTarget;
 function applyRowIcon(row,name){
   row.dataset.icon=name;
@@ -43,19 +61,24 @@ function calendarRow(source){
 function sliders(){for(const id of ['weekHeight','fontWeight','nightBrightness'])$(id+'-value').textContent=$(id).value+(id==='fontWeight'?'':id==='nightBrightness'?'%':' px');}
 async function load(){
   const response=await fetch('/api/settings');if(!response.ok)throw Error('Unable to load settings');config=await response.json();
-  document.body.dataset.theme=config.theme;
-  document.body.dataset.paper=String(config.paperTexture);
   for(const key of keys){if(binaryKeys.has(key))$(key).checked=config[key];else $(key).value=config[key];}
+  $('theme').value=KitchenAppearance.apply(config);
+  $('visual-timer-settings').replaceChildren();(config.visualTimers||[]).forEach(visualTimerRow);
   $('calendar-sources').replaceChildren();config.calendars.forEach(calendarRow);sliders();icons();
 }
 $('settings-form').onsubmit=e=>e.preventDefault();
 for(const id of ['weekHeight','fontWeight','nightBrightness'])$(id).oninput=sliders;
-$('theme').onchange=()=>document.body.dataset.theme=$('theme').value;
+$('theme').onchange=()=>KitchenAppearance.set({...config,paperTexture:$('paperTexture').checked},$('theme').value);
+window.addEventListener('storage',event=>{
+  if(config&&(event.key===KitchenAppearance.key||event.key===null))$('theme').value=KitchenAppearance.apply({...config,paperTexture:$('paperTexture').checked});
+});
 $('paperTexture').onchange=()=>document.body.dataset.paper=String($('paperTexture').checked);
 $('add-calendar').onclick=()=>{calendarRow({id:crypto.randomUUID(),name:'',color:['#d99a62','#d88691','#e3bb6e','#b49ac9'][document.querySelectorAll('.calendar-source').length%4],enabled:true});};
 $('save').onclick=async()=>{
   for(const control of $('settings-form').elements)if(!control.closest('.camera-source')&&!control.reportValidity())return;
   const payload={revision:config.revision};for(const key of keys)payload[key]=binaryKeys.has(key)?$(key).checked:$(key).value;
+  payload.visualTimers=Array.from(document.querySelectorAll('.visual-setting')).map(row=>({id:row.dataset.id,name:row.querySelector('.visual-name').value,group:row.querySelector('.visual-group').value,time:row.querySelector('.visual-time').value,enabled:row.querySelector('.visual-enabled').checked,variant:row.querySelector('.visual-variant').value,icon:row.querySelector('.visual-icon').value,days:Array.from(row.querySelectorAll('.visual-day:checked')).map(input=>Number(input.value))}));
+  if(payload.visualTimers.some(timer=>!timer.days.length)){$('save-status').textContent='Choose at least one weekday for each visual timer.';return;}
   payload.calendars=Array.from(document.querySelectorAll('.calendar-source')).map(row=>({id:row.dataset.id,name:row.querySelector('.name').value,color:row.querySelector('.color').value,icon:row.dataset.icon,enabled:row.querySelector('.enabled').checked,url:row.querySelector('.feed').value,configured:row.dataset.configured==='true',accountId:row.dataset.accountId,calendarId:row.dataset.calendarId}));
   $('save').disabled=true;$('save-status').textContent='Saving…';
   try{const response=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json','X-Kitchen-Request':'1'},body:JSON.stringify(payload)});const result=await response.json();if(!response.ok)throw Error(result.error);await load();$('save-status').textContent='Saved';}

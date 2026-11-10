@@ -60,15 +60,54 @@ does **not** change the physical monitor backlight or suspend the computer.
 Settings stays at normal brightness so it can always be adjusted.
 
 On the dashboard, the moon/sun button forces night mode on or off immediately.
-The clock button returns to the automatic schedule. Manual overrides use the
-saved dimming level and persist across reloads in that browser until cleared
-with the clock button; they do not change the schedule or other devices.
+The small schedule-clock button returns to automatic immediately. The dim button
+always toggles the effective brightness, including scheduled dimming. Manual
+overrides survive reloads only until the next start/end boundary, then the schedule
+takes over. Editing the schedule invalidates the override too. With scheduling
+disabled, the override lasts until changed manually. Settings stays bright enough
+to adjust controls, while its light/dark theme follows the dashboard shortcut.
 
 The sun/moon theme button switches light/dark appearance with a smooth fade,
 independently of brightness. Settings > Layout > Paper texture in light mode
 enables a locally served neutral paper background, or turns it off for a plain
 background. The theme shortcut persists in this browser; changing the default
 Appearance in Settings takes precedence when that change reaches the display.
+
+## Timers and Get Ready
+
+Touch the large clock to open up to eight independent countdown timers and a
+stopwatch. Timers have editable names/durations, pause/resume, reset, add-one-minute,
+remove and dismiss-alert controls. The stopwatch supports pause, reset and up to
+100 laps. A close button or Escape returns to the calendar without stopping clocks.
+Timers and stopwatch state are saved in that browser, with absolute timer deadlines
+so reloads and delayed background updates do not restart them. These are browser
+tools, not a system alarm: the browser must remain open. Sound needs a user gesture
+and can be muted; notifications are visual plus locally generated soft tones.
+
+Touch the date/day to open Get ready. Configure up to 32 visual timers under
+Settings > Clocks and visual timers: name, activity, time, weekdays, enabled state,
+icon and optional lunch-out/home condition. Select an activity and lunch option in
+Get ready. The display uses the configured timezone and next matching weekday;
+after every timer for that activity has passed, it advances to its next occurrence.
+Progress bars show the final hour. Activity countdowns are visual, not audible
+alarms. School holidays and one-off cancellations are not inferred: disable the
+relevant timers when needed. Family routines live only in private settings; new
+installations start with no visual timers. Settings can enable/disable each view.
+
+## Kiosk Touch
+
+The dedicated kiosk profile locks Firefox at 100% zoom and disables pinch zoom;
+vertical touch scrolling remains enabled. `configure-kiosk.py` preserves other
+`user.js` preferences and backs up saved site zoom before resetting it. It runs at
+kiosk startup and does not touch your normal Firefox profile. Preview separately:
+
+```bash
+python3 configure-kiosk.py --profile "$HOME/snap/firefox/common/kitchen-display-profile"
+```
+
+The app also uses [touch-action](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/touch-action)
+to allow panning without pinch zoom. Firefox settings are documented in the
+[Mozilla preference source](https://github.com/mozilla-firefox/firefox/blob/main/modules/libpref/init/StaticPrefList.yaml).
 
 ## Calendars
 
@@ -135,10 +174,13 @@ browser and check its console without publishing private event content.
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 node tests/night-mode.cjs
+node tests/time-logic.cjs
 ```
 
 `tests/settings-browser.cjs` uses mocked data and Playwright for UI regression
-tests. Install Playwright separately and set `PLAYWRIGHT_PATH` if needed. With
+tests. Install Playwright separately and set `PLAYWRIGHT_PATH` if needed.
+`tests/time-tools-browser.cjs` additionally checks timers, theme sync and recurring
+activity controls using synthetic data. With
 Snap Chromium set `CHROMIUM_PATH=/snap/bin/chromium` and `CHROMIUM_PROFILE` to a
 dedicated writable folder under `~/snap/chromium/common/`. Never use your normal
 browser profile. Browser screenshots stay in ignored `test-results/`.

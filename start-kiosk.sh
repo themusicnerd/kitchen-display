@@ -2,6 +2,8 @@
 set -euo pipefail
 profile="$HOME/snap/firefox/common/kitchen-display-profile"
 mkdir -p "$profile"
+root="$(cd -- "$(dirname -- "$0")" && pwd)"
+python3 "$root/configure-kiosk.py" --profile "$profile" --apply
 for attempt in {1..30}; do
   if /usr/bin/curl -fsS http://127.0.0.1:8090/api/status >/dev/null; then
     break
