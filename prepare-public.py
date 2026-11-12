@@ -12,6 +12,7 @@ FILES = [
     'configure-kiosk.py', 'kiosk-prefs.js', 'cast_support.py',
     'static/cast.js', 'static/cast-receiver.html', 'static/cast-receiver.js',
     'static/cast-receiver.css', 'tests/test_cast.py', 'tests/cast-browser.cjs',
+    'tests/camera-hold-browser.cjs',
     'requirements.txt', 'requirements.lock', '.gitignore', 'ACCOUNT_SETUP.md',
     'SECURITY.md', 'NOTICE.md', 'LICENSE', 'prepare-public.py',
     'static/index.html', 'static/settings.html', 'static/style.css', 'static/app.js',

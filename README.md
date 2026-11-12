@@ -82,6 +82,11 @@ HTTP. Query-string RTSP paths are treated as private and not returned to the for
 go2rtc bridges RTSP to HLS with a small playback delay. Expand opens all enabled
 cameras stacked; X or Escape returns. Each refresh icon reconnects its own player.
 A green dot means playback is advancing, not a guarantee of camera health.
+During a stall or reconnect, the last decoded image stays visible with an amber
+dot and a small "Reconnecting · last image" label. Fresh video replaces it once
+playback advances again, in both dashboard and expanded views. The held frame is
+kept only in browser memory, never saved to disk or sent to a snapshot service.
+Before the first successful frame, the Connecting/Reconnecting placeholder stays.
 Bridge API port 1984 and RTSP port 8554 bind only to loopback. Never expose the
 dashboard or cameras to the public internet.
 

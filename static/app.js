@@ -220,30 +220,47 @@ function renderCameras(){
     if(!p){
       const panel=element('div','camera offline');panel.dataset.camera=camera.id;
       const video=element('video');video.muted=true;video.autoplay=true;video.playsInline=true;video.setAttribute('aria-label',camera.name);
+      const heldFrame=element('canvas','camera-held-frame');heldFrame.hidden=true;heldFrame.setAttribute('aria-hidden','true');
       const dot=element('span','live-dot');dot.setAttribute('role','status');dot.setAttribute('aria-label',`${camera.name}: connecting`);
       const expand=element('button','icon-button camera-expand');expand.type='button';expand.title=`Expand ${camera.name}`;expand.setAttribute('aria-label',expand.title);expand.innerHTML='<i data-lucide="expand"></i>';
       expand.onclick=openCameras;
       const refresh=element('button','icon-button camera-refresh');refresh.type='button';refresh.title=`Restart ${camera.name} connection`;refresh.setAttribute('aria-label',refresh.title);refresh.innerHTML='<i data-lucide="refresh-cw"></i>';
-      const error=element('p','camera-error','Connecting');panel.append(video,dot,expand,refresh,error);$('cameras').append(panel);
-      p={panel,video,dot,error,refresh,lastTime:-1,lastAdvance:0,closed:false};players.set(camera.id,p);
+      const error=element('p','camera-error','Connecting');panel.append(video,heldFrame,dot,expand,refresh,error);$('cameras').append(panel);
+      p={panel,video,heldFrame,dot,error,refresh,lastTime:-1,lastAdvance:0,hasFrame:false,closed:false};players.set(camera.id,p);
+      p.captureFrame=()=>{
+        if(video.readyState<2||!video.videoWidth||!video.videoHeight)return;
+        try{
+          if(heldFrame.width!==video.videoWidth)heldFrame.width=video.videoWidth;
+          if(heldFrame.height!==video.videoHeight)heldFrame.height=video.videoHeight;
+          heldFrame.getContext('2d',{alpha:false}).drawImage(video,0,0);
+          p.hasFrame=true;
+        }catch{}
+      };
+      p.holdFrame=()=>{
+        p.captureFrame();heldFrame.hidden=!p.hasFrame;panel.classList.toggle('has-held-frame',p.hasFrame);
+        panel.classList.add('offline');error.hidden=false;error.textContent=p.hasFrame?'Reconnecting · last image':'Reconnecting';
+        refresh.setAttribute('aria-busy','true');dot.setAttribute('aria-label',`${camera.name}: reconnecting, not live`);
+      };
       p.connect=()=>{
         if(p.closed)return;
         clearTimeout(p.retry);p.retry=null;
+        p.holdFrame();
         const previous=p.hls;p.hls=null;previous?.destroy();
         video.pause();video.removeAttribute('src');video.load();
-        p.lastTime=-1;p.lastAdvance=0;panel.classList.add('offline');error.hidden=false;error.textContent='Reconnecting';
+        p.lastTime=-1;p.lastAdvance=0;
         refresh.setAttribute('aria-busy','true');dot.setAttribute('aria-label',`${camera.name}: reconnecting`);
         const url=`/api/stream.m3u8?src=${encodeURIComponent(camera.id)}`;
         if(window.Hls?.isSupported()){
           const hls=new Hls({enableWorker:false,liveSyncDurationCount:2,liveMaxLatencyDurationCount:5,backBufferLength:10,maxBufferLength:6});p.hls=hls;
           hls.loadSource(url);hls.attachMedia(video);
           hls.on(Hls.Events.MANIFEST_PARSED,()=>{if(p.hls===hls)video.play().catch(()=>{});});
-          hls.on(Hls.Events.ERROR,(_,data)=>{if(data.fatal&&p.hls===hls){p.hls=null;hls.destroy();clearTimeout(p.retry);p.retry=setTimeout(p.connect,5000);}});
+          hls.on(Hls.Events.ERROR,(_,data)=>{if(data.fatal&&p.hls===hls){p.holdFrame();p.lastAdvance=0;p.hls=null;hls.destroy();clearTimeout(p.retry);p.retry=setTimeout(p.connect,5000);}});
         }else if(video.canPlayType('application/vnd.apple.mpegurl')){video.src=url;video.play().catch(()=>{});}
         else{error.textContent='Video playback unavailable';}
       };refresh.onclick=()=>p.connect();p.connect();
     }
     p.video.style.objectFit=config.cameraFit;
+    p.heldFrame.style.objectFit=config.cameraFit;
     p.video.setAttribute('aria-label',camera.name);
     p.refresh.title=`Restart ${camera.name} connection`;p.refresh.setAttribute('aria-label',p.refresh.title);
     const slot=$('cameras').children[index+1];
@@ -252,10 +269,12 @@ function renderCameras(){
 }
 setInterval(()=>{for(const [id,p] of players){
   const camera=config?.cameras?.find(c=>c.id===id);
-  if(p.video.currentTime>p.lastTime+.05){p.lastTime=p.video.currentTime;p.lastAdvance=Date.now();}
+  if(p.video.readyState>=2&&p.video.currentTime>p.lastTime+.05){p.lastTime=p.video.currentTime;p.lastAdvance=Date.now();p.captureFrame();}
   const live=p.video.readyState>=2&&Date.now()-p.lastAdvance<5000;
   p.refresh.setAttribute('aria-busy',String(!live));
-  p.panel.classList.toggle('offline',!live);p.error.hidden=live;p.error.textContent='Reconnecting';
+  p.panel.classList.toggle('offline',!live);p.error.hidden=live;
+  if(live){p.heldFrame.hidden=true;p.panel.classList.remove('has-held-frame');}
+  else{p.holdFrame();}
   p.dot.setAttribute('aria-label',`${camera?.name||'Camera'}: ${live?'live':'offline'}`);
 }},1000);
 $('refresh').onclick=async()=>{

@@ -65,6 +65,10 @@ body[data-theme=dark] .primary{color:#241a10}
 @media(max-width:700px){.compact .event-header{display:block}.compact .event-header svg{display:none}.compact .day{padding-left:2px;padding-right:2px}.compact .event{padding-left:2px;padding-right:2px}}
 .camera-refresh{position:absolute;top:8px;right:8px;z-index:2;background:#0009;color:#fff}
 .camera-refresh[aria-busy=true]{color:#efb96d}
+.camera-held-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;pointer-events:none}
+.camera>.live-dot,.camera-expand,.camera-refresh{z-index:3}
+.camera-error{z-index:2}
+.camera.has-held-frame .camera-error{inset:auto auto 10px 10px;max-width:calc(100% - 68px);padding:6px 10px;border-radius:4px;background:#000b;font-size:14px}
 body{isolation:isolate;transition:background-color .7s ease,color .7s ease}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:url('/assets/paper-texture.png') repeat;background-size:640px 640px;opacity:0;transition:opacity .7s ease}
 body[data-theme=light][data-paper=true]{--bg:#f8f8f6;--surface:#ffffff88;--line:#d9dcd8;--ink:#252c2d;--muted:#5d6768;--today:#f9ecd9}
