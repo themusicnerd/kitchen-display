@@ -49,6 +49,19 @@ const os=require('node:os');
     await page.locator('#activity-focus .cast-source').click();assert(await page.locator('#cast-picker').isVisible());
     await page.locator('#close-cast-picker').click();
     await page.screenshot({path:path.join(__dirname,'../test-results/cast-touch.png')});
+    await page.locator('#tab-stopwatch').click();await page.locator('#stopwatch-toggle').click();
+    await page.locator('#cast-stopwatch').click();
+    await page.locator('#cast-screen option[value=screen-one]').waitFor({state:'attached'});
+    await page.locator('#cast-screen').selectOption('screen-one');await page.locator('#start-cast').click();
+    await page.waitForFunction(()=>document.querySelector('#cast-sessions').textContent.includes('Connected'));
+    assert.equal(calls.filter(x=>x.action==='start').at(-1).data.source.kind,'stopwatch');
+    await page.locator('#close-cast-picker').click();await page.locator('#stopwatch-lap').click();await page.locator('#stopwatch-toggle').click();
+    for(let i=0;i<60&&!calls.some(x=>x.action==='update'&&x.data.source.kind==='stopwatch'&&x.data.timer.status==='paused');i++)await page.waitForTimeout(100);
+    assert(calls.some(x=>x.action==='update'&&x.data.source.kind==='stopwatch'&&x.data.timer.status==='paused'&&x.data.timer.laps.length===1),'Stopwatch pause and lap synchronise');
+    await page.locator('#stopwatch-reset').click();
+    for(let i=0;i<60&&!calls.some(x=>x.action==='update'&&x.data.source.kind==='stopwatch'&&x.data.timer.status==='idle');i++)await page.waitForTimeout(100);
+    assert(calls.some(x=>x.action==='update'&&x.data.source.kind==='stopwatch'&&x.data.timer.status==='idle'&&x.data.timer.elapsedMs===0),'Stopwatch reset synchronises');
+    await page.locator('#cast-stopwatch').click();await page.locator('#cast-sessions button').click();await page.locator('#close-cast-picker').click();
     let timer={name:'Leave for our activity',status:'running',endAt:Date.now()+1830000,remainingMs:1830000,kind:'countdown'},ended=false;
     await browser.route('https://www.gstatic.com/**',route=>route.abort());
     await browser.route('**/cast/state',async route=>{
@@ -69,7 +82,21 @@ const os=require('node:os');
     timer={...timer,status:'paused',endAt:null,remainingMs:45000};
     for(let i=0;i<60&&await tv.locator('#tv-state').textContent()!=='Paused';i++)await tv.waitForTimeout(100);
     assert.equal(await tv.locator('#activity-focus-remaining').textContent(),'00:45');
+    timer={name:'Stopwatch',kind:'stopwatch',status:'running',elapsedMs:65000,startedAt:Date.now(),endAt:null,remainingMs:0,laps:[10000,30000]};
+    for(const size of [{width:1920,height:1080},{width:1280,height:720},{width:960,height:540},{width:390,height:844}]){
+      await tv.setViewportSize(size);await tv.goto(base+'/cast/timer#'+'a'.repeat(43));await tv.locator('#tv-stopwatch-time').waitFor({state:'visible'});
+      assert(await tv.locator('#tv-dial-space').isHidden());assert.equal(await tv.locator('#tv-stopwatch-laps li').count(),2);
+      const first=await tv.locator('#tv-stopwatch-time').textContent();await tv.waitForTimeout(300);assert.notEqual(await tv.locator('#tv-stopwatch-time').textContent(),first);
+      const fits=await tv.locator('#tv-stopwatch-time').evaluate(el=>{const r=el.getBoundingClientRect();return r.right<=innerWidth&&r.bottom<=innerHeight&&el.scrollWidth<=el.clientWidth;});assert(fits,'Stopwatch fits the receiver without clipping');
+      await tv.screenshot({path:path.join(__dirname,`../test-results/cast-stopwatch-${size.width}.png`)});
+    }
+    timer={...timer,status:'paused',elapsedMs:65000,startedAt:null};
+    for(let i=0;i<60&&await tv.locator('#tv-state').textContent()!=='Paused';i++)await tv.waitForTimeout(100);
+    assert.equal(await tv.locator('#tv-stopwatch-time').textContent(),'00:01:05.00');await tv.waitForTimeout(300);assert.equal(await tv.locator('#tv-stopwatch-time').textContent(),'00:01:05.00');
+    timer={...timer,status:'idle',elapsedMs:0,laps:[]};
+    for(let i=0;i<60&&await tv.locator('#tv-state').textContent()!=='Ready';i++)await tv.waitForTimeout(100);
+    assert.equal(await tv.locator('#tv-stopwatch-time').textContent(),'00:00:00.00');assert.equal(await tv.locator('#tv-stopwatch-laps li').count(),0);
     ended=true;for(let i=0;i<60&&await tv.locator('#tv-message').textContent()!=='Timer sharing ended';i++)await tv.waitForTimeout(100);assert(await tv.locator('#tv-timer').isHidden());
-    assert.deepEqual(errors,[]);console.log('Cast picker, touch selector, pause sync, revoke and 16:9 receiver checks passed.');
+    assert.deepEqual(errors,[]);console.log('Cast picker, countdown/stopwatch controls, laps, revoke and responsive receiver checks passed.');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

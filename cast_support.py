@@ -57,6 +57,22 @@ def finite_number(value, maximum):
 def timer_snapshot(conf, source, timer=None):
     kind, source_id = source.get('kind'), clean_id(source.get('id'))
     now = time.time() * 1000
+    if kind == 'stopwatch':
+        if source_id != 'stopwatch' or not conf.get('timeToolsEnabled', True) or not isinstance(timer, dict):
+            raise CastError('The stopwatch is not available.')
+        status = timer.get('status')
+        if status not in ('idle', 'running', 'paused'):
+            raise CastError('Invalid stopwatch state.')
+        elapsed = finite_number(timer.get('elapsedMs'), 365*86400000)
+        laps = timer.get('laps', [])
+        if not isinstance(laps, list) or len(laps) > 100:
+            raise CastError('Invalid stopwatch laps.')
+        laps = [finite_number(lap, elapsed) for lap in laps]
+        if laps != sorted(laps):
+            raise CastError('Invalid stopwatch lap order.')
+        return {'name': 'Stopwatch', 'status': status, 'kind': kind, 'elapsedMs': elapsed,
+                'startedAt': now if status == 'running' else None, 'laps': laps,
+                'endAt': None, 'remainingMs': 0}
     if kind == 'activity':
         if not conf.get('visualTimersEnabled', True):
             raise CastError('Activity countdowns are disabled.')
@@ -178,6 +194,8 @@ class CastManager:
                'expiresAt': min(now+8*86400, max(now+600, (timer['endAt'] or now*1000)/1000+900)),
                'theme': 'light' if body.get('theme') == 'light' else 'dark', 'paperTexture': bool(body.get('paperTexture')),
                'timezone': conf['timezone']}
+        if timer['kind'] == 'stopwatch':
+            job['expiresAt'] = now+8*86400
         url = self._origin(info.host, port)+'/cast/timer#'+token
         with self.lock:
             self.jobs[job_id] = job
@@ -280,6 +298,8 @@ class CastManager:
             self._prune()
             job = self.jobs.get(self.tokens.get(hashlib.sha256(token.encode()).hexdigest()))
             if job is None or not self.get_settings().get('castEnabled', True):
+                return None
+            if job['source']['kind'] in ('countdown', 'stopwatch') and not self.get_settings().get('timeToolsEnabled', True):
                 return None
             if job['source']['kind'] == 'activity':
                 try:

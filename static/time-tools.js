@@ -20,6 +20,11 @@
   const activityFocus=document.createElement('section');activityFocus.id='activity-focus';activityFocus.className='activity-focus-view';activityFocus.hidden=true;activityFocus.setAttribute('aria-labelledby','activity-focus-title');
   activityFocus.innerHTML='<header class="activity-focus-heading"><div><h3 id="activity-focus-title"></h3><p id="activity-focus-at" class="activity-at"></p></div><button id="activity-unfocus" class="icon-button view-close" type="button" title="All timers" aria-label="Back to all activity timers"><i data-lucide="arrow-left"></i></button></header><div id="activity-dial-space" class="activity-dial-space"><div id="activity-dial" class="activity-dial"><div id="activity-pie" class="activity-pie" role="progressbar" aria-valuemin="0" aria-valuemax="60"></div><div id="activity-minute-ring" class="activity-minute-ring" role="progressbar" aria-label="Seconds remaining in this minute" aria-valuemin="0" aria-valuemax="60"></div><span class="dial-mark dial-mark-top" aria-hidden="true">60</span><span class="dial-mark dial-mark-right" aria-hidden="true">15</span><span class="dial-mark dial-mark-bottom" aria-hidden="true">30</span><span class="dial-mark dial-mark-left" aria-hidden="true">45</span><div class="activity-focus-clock"><output id="activity-focus-remaining" role="timer"></output></div></div></div>';
   el('pane-activities').append(activityFocus);
+  if(window.KitchenCast){
+    const castButton=KitchenCast.button({kind:'stopwatch',id:'stopwatch'});
+    castButton.id='cast-stopwatch';castButton.title='Cast stopwatch';castButton.setAttribute('aria-label',castButton.title);
+    dialog.querySelector('.stopwatch-controls').append(castButton);
+  }
   let focusedActivity=null,activityOrigin=null,activityListScroll=0;
   function fitActivityDial(){
     if(!focusedActivity||!dialog.open)return;
@@ -200,6 +205,12 @@
   renderTimers();renderLaps();setInterval(tick,100);setInterval(()=>{if(config)refreshOptions();},1000);
   function castSnapshot(source){
     if(!config)return null;
+    if(source.kind==='stopwatch'){
+      if(config.timeToolsEnabled===false)return null;
+      const s=state.stopwatch;
+      return {name:'Stopwatch',status:s.startedAt!==null?'running':s.elapsedMs?'paused':'idle',
+        elapsedMs:T.elapsed(s),startedAt:s.startedAt,laps:[...s.laps]};
+    }
     if(source.kind==='countdown'){
       const timer=state.timers.find(t=>t.id===source.id);
       return timer&&config.timeToolsEnabled!==false?{name:timer.name,status:timer.status,endAt:timer.endAt,remainingMs:T.remaining(timer)}:null;

@@ -17,7 +17,7 @@
     const timer=snapshot(source);if(!timer)throw Error('This timer is no longer available.');
     return {clientId,source,timer,theme:document.body.dataset.theme,paperTexture:config.paperTexture};
   }
-  function fingerprint(value){const timer=value.timer;return JSON.stringify([timer.name,timer.status,timer.endAt,timer.status==='running'?null:timer.remainingMs,value.theme,value.paperTexture]);}
+  function fingerprint(value){const timer=value.timer;return JSON.stringify([timer.name,timer.status,timer.endAt,timer.startedAt,timer.status==='running'?null:timer.remainingMs,timer.status==='running'?null:timer.elapsedMs,timer.laps,value.theme,value.paperTexture]);}
   function renderSessions(){
     $('cast-sessions').replaceChildren();
     for(const session of sessions){

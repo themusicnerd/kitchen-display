@@ -31,13 +31,15 @@ http://localhost:8090/. Services start at user login, not before a login session
 
 ## Cast Timers
 
-Each countdown and Get Ready timer has a Cast icon, including the expanded visual
+Each countdown, stopwatch and Get Ready timer has a Cast icon, including the expanded visual
 countdown. Touch it, choose a discovered screen, then press Cast. Merely opening
 the picker does not interrupt a TV. The receiver uses a landscape layout with the
 timer name beside a large hour pie and seconds ring. Pause, resume, reset and
 duration changes synchronise while the sending dashboard is open. Closing the
 picker does not stop sharing; its square stop button revokes the selected session.
-Stopwatch casting is not included.
+The stopwatch receiver shows a large elapsed-time clock and the five most recent
+laps. Start, pause/resume, lap recording and reset synchronise from the sending
+dashboard. Its Cast icon is alongside the stopwatch controls.
 
 Settings > Google Cast can disable casting, set an optional reachable LAN server
 origin, or add private device IPs when multicast discovery needs help. Audio-only
@@ -58,7 +60,8 @@ calendar accounts, events, cameras or Settings. It is sent as a URL fragment and
 used as a bearer token; keep it private. Generic receiver assets are available
 without Basic auth on the LAN so a TV can load them. Timer sessions are held only
 in server memory and end on server restart, disabling casting, explicit stop or
-expiry (15 minutes after a running countdown ends, with an eight-day maximum).
+expiry (15 minutes after a running countdown ends, with an eight-day maximum;
+stopwatch sessions expire eight days after casting starts).
 Idle/paused sessions expire after at least ten minutes unless already granted a
 longer running deadline; keep the dashboard open for timer control. Stop revokes
 the timer page; it does not issue a global command that could stop another app

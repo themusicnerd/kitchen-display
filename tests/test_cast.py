@@ -15,7 +15,7 @@ class CastTests(unittest.TestCase):
         self.conf = dict(server.DEFAULT, calendars=[], visualTimers=[])
         self.manager = C.CastManager(lambda: self.conf)
 
-    def launch(self):
+    def launch(self, kind='countdown'):
         info = SimpleNamespace(uuid='fixture-screen', friendly_name='Test screen', host='192.168.1.50', model_name='Test TV')
         self.manager.devices = {'fixture-screen': info}
         self.manager.last_scan = time.time()
@@ -27,9 +27,11 @@ class CastTests(unittest.TestCase):
              patch('pychromecast.controllers.dashcast.DashCastController', return_value=controller), \
              patch.object(self.manager, '_origin', return_value='http://192.168.1.2:8090'):
             controller.load_url.side_effect = lambda *a, **kw: [j.update(lastSeen=time.time()) for j in self.manager.jobs.values()]
+            stopwatch = kind == 'stopwatch'
             job = self.manager.start({'clientId': 'fixture-client', 'deviceId': 'fixture-screen',
-                'source': {'kind': 'countdown', 'id': 'timer-one'},
-                'timer': {'name': 'Test timer', 'status': 'running', 'remainingMs': 1800000}}, 8090)
+                'source': {'kind': kind, 'id': 'stopwatch' if stopwatch else 'timer-one'},
+                'timer': {'name': 'Test timer', 'status': 'running', 'remainingMs': 1800000,
+                          'elapsedMs': 65000, 'laps': [10000]}}, 8090)
         controller.launch.assert_called_once()
         self.assertTrue(controller.launch.call_args.kwargs['force_launch'])
         token = controller.load_url.call_args.args[0].split('#')[1]
@@ -79,6 +81,39 @@ class CastTests(unittest.TestCase):
     def test_activity_must_be_configured(self):
         with self.assertRaises(C.CastError):
             C.timer_snapshot(self.conf, {'kind': 'activity', 'id': 'missing', 'at': time.time()*1000})
+
+    def test_stopwatch_snapshot_and_validation(self):
+        source = {'kind': 'stopwatch', 'id': 'stopwatch'}
+        timer = {'status': 'running', 'elapsedMs': 65000, 'laps': [10000, 30000]}
+        value = C.timer_snapshot(self.conf, source, timer)
+        self.assertEqual(value['kind'], 'stopwatch')
+        self.assertEqual(value['elapsedMs'], 65000)
+        self.assertAlmostEqual(value['startedAt'], time.time()*1000, delta=100)
+        self.assertEqual(value['laps'], [10000, 30000])
+        value = C.timer_snapshot(self.conf, source, dict(timer, status='paused'))
+        self.assertIsNone(value['startedAt'])
+        for change in ({'elapsedMs': -1}, {'elapsedMs': float('inf')}, {'status': 'finished'},
+                       {'laps': [70000]}, {'laps': [30000, 10000]}, {'laps': [True]}, {'laps': list(range(101))}):
+            with self.assertRaises(C.CastError):
+                C.timer_snapshot(self.conf, source, dict(timer, **change))
+        self.conf['timeToolsEnabled'] = False
+        with self.assertRaises(C.CastError): C.timer_snapshot(self.conf, source, timer)
+
+    def test_stopwatch_session_and_updates(self):
+        job, token = self.launch('stopwatch')
+        self.assertAlmostEqual(job['expiresAt']-time.time(), 8*86400, delta=3)
+        self.assertEqual(self.manager.receiver(token)['timer']['kind'], 'stopwatch')
+        self.manager.update({'sessionId': job['id'], 'clientId': 'fixture-client',
+            'timer': {'status': 'paused', 'elapsedMs': 70000, 'laps': [10000, 60000]}})
+        timer = self.manager.receiver(token)['timer']
+        self.assertEqual(timer['elapsedMs'], 70000)
+        self.assertIsNone(timer['startedAt'])
+        self.assertEqual(timer['laps'], [10000, 60000])
+        self.manager.update({'sessionId': job['id'], 'clientId': 'fixture-client',
+            'timer': {'status': 'idle', 'elapsedMs': 0, 'laps': []}})
+        self.assertEqual(self.manager.receiver(token)['timer']['elapsedMs'], 0)
+        self.conf['timeToolsEnabled'] = False
+        self.assertIsNone(self.manager.receiver(token))
 
     def test_receiver_does_not_unlock_dashboard(self):
         manager = self.manager
