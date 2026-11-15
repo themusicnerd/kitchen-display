@@ -22,7 +22,8 @@
     $('cast-sessions').replaceChildren();
     for(const session of sessions){
       const row=document.createElement('div');row.className='cast-session';
-      const label=document.createElement('span');label.textContent=session.deviceName+(session.lastSeen?' · Connected':' · Waiting for screen');
+      const recent=session.lastSeen&&Date.now()/1000-session.lastSeen<8;
+      const label=document.createElement('span');label.textContent=session.deviceName+(recent?' · Connected':session.lastSeen?' · Connection lost':' · Waiting for screen');
       const stop=document.createElement('button');stop.className='icon-button';stop.type='button';stop.title='Stop sharing to '+session.deviceName;stop.setAttribute('aria-label',stop.title);stop.innerHTML='<i data-lucide="square"></i>';
       stop.onclick=async()=>{stop.disabled=true;try{await request('/api/cast/stop',{clientId,sessionId:session.id});sessions=sessions.filter(item=>item.id!==session.id);fingerprints.delete(session.id);renderSessions();$('cast-status').textContent='Timer sharing stopped.';}catch(error){$('cast-status').textContent=error.message;stop.disabled=false;}};
       row.append(label,stop);$('cast-sessions').append(row);
@@ -67,7 +68,7 @@
     try{
       const data=payload(selected),job=await request('/api/cast/start',{...data,deviceId:$('cast-screen').value});
       sessions=sessions.filter(item=>item.deviceName!==job.deviceName);sessions.push(job);fingerprints.set(job.id,fingerprint(data));
-      $('cast-status').textContent='Timer sent. Waiting for the screen to connect.';renderSessions();
+      $('cast-status').textContent=job.lastSeen?'Sharing to '+job.deviceName+'.':'Timer sent. Waiting for the screen to connect.';renderSessions();
     }catch(error){$('cast-status').textContent=error.message;}
     finally{busy=false;$('start-cast').disabled=!$('cast-screen').value;}
   };

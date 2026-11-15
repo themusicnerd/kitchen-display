@@ -21,11 +21,21 @@ class CastTests(unittest.TestCase):
         self.manager.last_scan = time.time()
         cast = MagicMock()
         controller = MagicMock()
-        controller.launch.side_effect = lambda **kw: kw['callback_function'](True)
+        controller.is_active = False
+        def launch_callback(**kw):
+            controller.is_active = True
+            cast.status.app_id = 'fixture-app'
+            kw['callback_function'](True)
+        controller.launch.side_effect = launch_callback
         cast.status.app_id = controller.supporting_app_id = 'fixture-app'
+        cast.quit_app.side_effect = lambda **kw: setattr(cast.status, 'app_id', None)
+        self.last_cast, self.last_link = cast, MagicMock()
         with patch('pychromecast.get_chromecast_from_cast_info', return_value=cast), \
              patch('pychromecast.controllers.dashcast.DashCastController', return_value=controller), \
-             patch.object(self.manager, '_origin', return_value='http://192.168.1.2:8090'):
+             patch.object(self.manager, '_origin', return_value='http://192.168.1.2:8090'), \
+             patch.object(C, 'timer_controller', return_value=MagicMock()), \
+             patch.object(C, 'LiveCastLink', return_value=self.last_link), \
+             patch('zeroconf.Zeroconf'), patch.object(C.time, 'sleep'):
             controller.load_url.side_effect = lambda *a, **kw: [j.update(lastSeen=time.time()) for j in self.manager.jobs.values()]
             stopwatch = kind == 'stopwatch'
             job = self.manager.start({'clientId': 'fixture-client', 'deviceId': 'fixture-screen',
@@ -34,6 +44,7 @@ class CastTests(unittest.TestCase):
                           'elapsedMs': 65000, 'laps': [10000]}}, 8090)
         controller.launch.assert_called_once()
         self.assertTrue(controller.launch.call_args.kwargs['force_launch'])
+        cast.disconnect.assert_not_called()
         token = controller.load_url.call_args.args[0].split('#')[1]
         return job, token
 
@@ -58,6 +69,7 @@ class CastTests(unittest.TestCase):
         self.assertEqual(self.manager.receiver(token)['timer']['remainingMs'], 45000)
         self.assertEqual(self.manager.status('someone-else')['sessions'], [])
         self.manager.stop({'sessionId': job['id'], 'clientId': 'fixture-client'})
+        self.last_link.close.assert_called_once()
         self.assertIsNone(self.manager.receiver(token))
 
     def test_expiry_disable_and_invalid_numbers(self):
@@ -73,10 +85,58 @@ class CastTests(unittest.TestCase):
 
     def test_replacing_screen_revokes_old_link(self):
         _, previous = self.launch()
+        old_link = self.last_link
         _, current = self.launch()
         self.assertIsNone(self.manager.receiver(previous))
         self.assertIsNotNone(self.manager.receiver(current))
         self.assertEqual(len(self.manager.jobs), 1)
+        old_link.close.assert_called_once()
+        self.last_link.close.assert_not_called()
+
+    def test_expiry_releases_sender(self):
+        job, _ = self.launch()
+        self.manager.jobs[job['id']]['expiresAt'] = time.time()-1
+        self.assertEqual(self.manager.status('fixture-client')['sessions'], [])
+        self.last_link.close.assert_called_once()
+
+    def test_failed_launch_closes_resolver_and_preserves_previous_link(self):
+        old_job, token = self.launch()
+        old_link = self.last_link
+        resolver = MagicMock()
+        with patch('zeroconf.Zeroconf', return_value=resolver), \
+             patch('pychromecast.get_chromecast_from_cast_info', side_effect=RuntimeError), \
+             patch.object(self.manager, '_origin', return_value='http://192.168.1.2:8090'):
+            with self.assertRaises(C.CastError):
+                self.manager.start({'clientId': 'fixture-client', 'deviceId': 'fixture-screen',
+                    'source': {'kind': 'countdown', 'id': 'another'},
+                    'timer': {'name': 'Another timer', 'status': 'running', 'remainingMs': 60000}}, 8090)
+        resolver.close.assert_called_once()
+        old_link.close.assert_not_called()
+        self.assertEqual(list(self.manager.jobs), [old_job['id']])
+        self.assertIsNotNone(self.manager.receiver(token))
+
+    def test_sender_heartbeat_and_cleanup_do_not_quit_other_apps(self):
+        for allowed, active, sends in ((True, True, 1), (False, True, 0), (True, False, 0)):
+            link = object.__new__(C.LiveCastLink)
+            link.cast, link.resolver, link.controller = MagicMock(), MagicMock(), MagicMock()
+            link.controller.is_active = active
+            link.allowed = lambda: allowed
+            link.closed = MagicMock()
+            link.closed.wait.side_effect = [False, True]
+            link._watch()
+            self.assertEqual(link.controller.send_message.call_count, sends)
+            link.cast.disconnect.assert_called_once_with(timeout=3)
+            link.cast.quit_app.assert_not_called()
+            link.resolver.close.assert_called_once()
+
+    def test_sender_close_stops_worker(self):
+        cast, resolver = MagicMock(), MagicMock()
+        link = C.LiveCastLink(cast, resolver, MagicMock(), lambda: True)
+        link.close()
+        link.worker.join(timeout=1)
+        self.assertFalse(link.worker.is_alive())
+        cast.disconnect.assert_called_once_with(timeout=3)
+        resolver.close.assert_called_once()
 
     def test_activity_must_be_configured(self):
         with self.assertRaises(C.CastError):

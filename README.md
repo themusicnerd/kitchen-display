@@ -53,7 +53,13 @@ loads a local dedicated timer page. TV internet access is needed for DashCast an
 Google's Cast receiver framework. This avoids registering your own receiver but
 depends on that external app continuing to be available. Device firmware may
 affect compatibility; there is no video-transcoding fallback. The receiver has
-been tested on a Google Nest Hub; built-in TV receiver compatibility can vary.
+been tested on a Google Nest Hub and a Smart TV with Cast built in; receiver
+compatibility can vary. The NUC keeps a sender connection joined to the timer's
+own Cast namespace for the lifetime of the session. This prevents receivers from
+closing the page as soon as the launch request finishes. Stop, expiry, replacing
+the timer, disabling Cast or switching the TV to another app releases that link
+without relaunching the TV app. The picker reports Connection lost when receiver
+polls stop, rather than treating a single old poll as a live connection.
 
 A short-lived, revocable random link grants access to **one timer only**, never
 calendar accounts, events, cameras or Settings. It is sent as a URL fragment and

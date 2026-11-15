@@ -17,6 +17,47 @@ class CastError(ValueError):
     pass
 
 
+TIMER_NAMESPACE = 'urn:x-cast:kitchen.timer'
+
+
+def timer_controller():
+    from pychromecast.controllers import BaseController
+    class TimerController(BaseController):
+        def receive_message(self, message, data):
+            return True
+    return TimerController(TIMER_NAMESPACE)
+
+
+class LiveCastLink:
+    """Keep a sender joined to the navigated receiver, without relaunching apps."""
+    def __init__(self, cast, resolver, controller, allowed):
+        self.cast, self.resolver, self.controller = cast, resolver, controller
+        self.allowed = allowed
+        self.closed = threading.Event()
+        self.worker = threading.Thread(target=self._watch, daemon=True)
+        self.worker.start()
+
+    def close(self):
+        self.closed.set()
+
+    def _watch(self):
+        try:
+            while not self.closed.wait(5):
+                if not self.allowed() or not self.controller.is_active:
+                    break
+                self.controller.send_message({'type': 'heartbeat'}, no_add_request_id=True)
+        except Exception:
+            logging.warning('Cast sender connection ended; the screen may need reconnecting.')
+        finally:
+            self.closed.set()
+            try:
+                self.cast.disconnect(timeout=3)
+            except Exception:
+                pass
+            finally:
+                self.resolver.close()
+
+
 def private_address(host):
     try:
         address = ipaddress.ip_address(host)
@@ -157,6 +198,8 @@ class CastManager:
         now = time.time()
         for job_id, job in list(self.jobs.items()):
             if job['expiresAt'] <= now:
+                if job.get('_link'):
+                    job['_link'].close()
                 self.tokens.pop(job['tokenHash'], None)
                 self.jobs.pop(job_id, None)
 
@@ -207,21 +250,38 @@ class CastManager:
             # Discovery closes its own resolver; each launch needs a live resolver.
             resolver = Zeroconf()
             cast = None
+            retained = False
             try:
                 cast = pychromecast.get_chromecast_from_cast_info(info, resolver, tries=1, retry_wait=1, timeout=6)
                 cast.wait(timeout=10)
                 controller = DashCastController()
                 cast.register_handler(controller)
+                timer_channel = timer_controller()
+                cast.register_handler(timer_channel)
                 complete = threading.Event()
                 result = []
                 def callback(success, response=None):
                     result.append(success)
                     complete.set()
-                if cast.status.app_id == controller.supporting_app_id:
+                if cast.status.app_id == controller.supporting_app_id and not controller.is_active:
+                    # Detach older senders before restarting the same app. A
+                    # late disconnect from them can otherwise cancel its launch.
+                    with self.lock:
+                        old_links = [previous.pop('_link') for previous_id, previous in self.jobs.items()
+                                     if previous_id != job_id and previous['deviceId'] == job['deviceId'] and previous.get('_link')]
+                    for old_link in old_links:
+                        old_link.close()
+                        old_link.worker.join(timeout=4)
                     cast.quit_app(timeout=8)
+                    # Some built-in TV receivers acknowledge STOP before the
+                    # previous app has finished shutting down.
+                    idle_until = time.monotonic()+5
+                    while cast.status.app_id == controller.supporting_app_id and time.monotonic() < idle_until:
+                        time.sleep(.1)
+                    time.sleep(1)
                 # A previous timer navigated away from DashCast's message bus.
                 # Relaunch its bootstrap before sending another timer URL.
-                controller.launch(force_launch=True, callback_function=callback)
+                controller.launch(force_launch=not controller.is_active, callback_function=callback)
                 if not complete.wait(35) or not result or not result[0]:
                     raise CastError('The screen did not launch DashCast. Check it is awake and online.')
                 ready_until = time.monotonic()+10
@@ -233,21 +293,34 @@ class CastManager:
                 # DashCast does not always acknowledge custom messages. An HTTP
                 # receiver poll is stronger evidence than a protocol callback.
                 until = time.monotonic()+10
+                connected = False
                 while time.monotonic() < until:
                     with self.lock:
                         connected = job['lastSeen'] is not None
                     if connected:
                         break
                     time.sleep(.2)
-                active = getattr(cast.status, 'app_id', None) == controller.supporting_app_id
-                if not (connected or active):
-                    raise CastError('The screen did not accept the timer. Try refreshing the device list.')
+                if not connected:
+                    raise CastError('The TV launched Cast but did not load the timer. Check its connection to the display server.')
+                ready_until = time.monotonic()+5
+                while not timer_channel.is_active and time.monotonic() < ready_until:
+                    time.sleep(.1)
+                if not timer_channel.is_active:
+                    raise CastError('The timer page loaded, but its Cast connection did not become ready. Try again.')
+                def allowed():
+                    with self.lock:
+                        return (self.jobs.get(job_id) is job and job['expiresAt'] > time.time()
+                                and self.get_settings().get('castEnabled', True))
+                with self.lock:
+                    job['_link'] = LiveCastLink(cast, resolver, timer_channel, allowed)
+                    retained = True
             finally:
                 try:
-                    if cast is not None:
+                    if cast is not None and not retained:
                         cast.disconnect(timeout=3)
                 finally:
-                    resolver.close()
+                    if not retained:
+                        resolver.close()
         except CastError:
             with self.lock:
                 self.tokens.pop(digest, None)
@@ -263,6 +336,8 @@ class CastManager:
             # cannot cancel this app launch while the old page is still active.
             for previous_id, previous in list(self.jobs.items()):
                 if previous_id != job_id and previous['deviceId'] == job['deviceId']:
+                    if previous.get('_link'):
+                        previous['_link'].close()
                     self.tokens.pop(previous['tokenHash'], None)
                     self.jobs.pop(previous_id, None)
         return self.public_job(job)
@@ -287,6 +362,8 @@ class CastManager:
             if job and job['clientId'] != body.get('clientId'):
                 raise CastError('This Cast session belongs to another browser.')
             if job:
+                if job.get('_link'):
+                    job['_link'].close()
                 self.tokens.pop(job['tokenHash'], None)
                 self.jobs.pop(job['id'], None)
             return {'ok': True}
