@@ -65,6 +65,12 @@ body[data-theme=dark] .primary{color:#241a10}
 @media(max-width:700px){.compact .event-header{display:block}.compact .event-header svg{display:none}.compact .day{padding-left:2px;padding-right:2px}.compact .event{padding-left:2px;padding-right:2px}}
 .camera-refresh{position:absolute;top:8px;right:8px;z-index:2;background:#0009;color:#fff}
 .camera-refresh[aria-busy=true]{color:#efb96d}
+.settings-heading{flex-wrap:wrap}.settings-heading h1{min-width:0;overflow-wrap:anywhere}
+#restart-display{width:52px;height:52px}
+#restart-dialog p{line-height:1.5;overflow-wrap:anywhere}
+#restart-status{min-height:24px;margin-top:18px;color:var(--accent)}
+.restart-actions{display:flex;justify-content:flex-end;margin-top:18px}
+@media(max-width:500px){.settings-heading{display:grid;grid-template-columns:44px minmax(0,1fr) 52px}.settings-heading #save{grid-column:2/4;justify-self:end}}
 .camera-held-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;pointer-events:none}
 .camera>.live-dot,.camera-expand,.camera-refresh{z-index:3}
 .camera-error{z-index:2}

@@ -26,6 +26,7 @@ import requests
 import oauth_accounts as accounts
 import camera_config
 import cast_support
+import recovery
 
 ROOT = Path(__file__).resolve().parent
 PRIVATE = Path.home() / '.config/kitchen-display'
@@ -536,6 +537,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send({**STATE, 'events': events})
         if path == '/api/status':
             return self.send({'cameras': public_cameras(), 'now': time.time()})
+        if path == '/api/recovery':
+            if not ipaddress.ip_address(self.client_address[0]).is_loopback:
+                return self.send({'error': 'Restart services on this display using localhost.'}, status=403)
+            return self.send({'generation': recovery.GENERATION})
         if path == '/api/cast/state':
             try:
                 return self.send(CAST.status(parse_qs(urlsplit(self.path).query).get('client', [''])[0]))
@@ -597,6 +602,15 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 <= length <= 131072:
                 raise ValueError('Request too large.')
             body = json.loads(self.rfile.read(length) or '{}')
+            if self.path == '/api/recovery':
+                if not ipaddress.ip_address(self.client_address[0]).is_loopback:
+                    return self.send({'error': 'Restart services on this display using localhost.'}, status=403)
+                if not isinstance(body, dict) or set(body) != {'confirm'} or body['confirm'] is not True:
+                    return self.send({'error': 'Confirm the service restart first.'}, status=400)
+                try:
+                    return self.send(recovery.schedule_restart(), status=202)
+                except recovery.RecoveryError as exc:
+                    return self.send({'error': str(exc)}, status=503)
             if self.path.startswith('/api/cast/'):
                 try:
                     action = self.path.rsplit('/', 1)[-1]

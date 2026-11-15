@@ -27,3 +27,8 @@ The public repository contains no working camera credentials or OAuth apps.
 
 For suspected vulnerabilities, contact the repository owner privately through
 their GitHub profile rather than opening an issue containing secrets.
+
+The service-restart API is loopback-only, requires the usual JSON/same-origin
+request header plus explicit confirmation, and accepts no service names or shell
+commands. A transient systemd user timer restarts a fixed appliance-service list
+outside the HTTP server's own unit. It uses no sudo and never reboots the host.

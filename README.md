@@ -67,6 +67,20 @@ longer running deadline; keep the dashboard open for timer control. Stop revokes
 the timer page; it does not issue a global command that could stop another app
 you subsequently opened on the TV. It does not resume previous TV content.
 
+## Restart Display Services
+
+The restart icon at the top of Settings opens a confirmation dialog. Confirming
+queues a restart of the Firefox kiosk, dashboard/Cast server and camera bridge
+after three seconds. Active casts end and unsaved edits are lost; saved settings,
+accounts and media are not changed. The screen returns to the dashboard. Other
+open Settings browsers reload after the new server is reachable.
+
+This control is localhost-only and uses a fixed systemd user-service list, without
+sudo or arbitrary commands. It does not reboot Linux, reset USB devices or change
+touch calibration. It can clear a stuck browser or stale app connections, but is
+not a fix for a disconnected touchscreen, TV/network problems or camera faults.
+If the browser cannot respond to taps, use a mouse/keyboard to open Settings.
+
 ## Cameras
 
 In Settings > Cameras, add up to four cameras. Each has a name, enabled switch,

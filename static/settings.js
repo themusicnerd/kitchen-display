@@ -4,6 +4,40 @@ const icons=()=>window.lucide?.createIcons();
 const keys=['title','timezone','upcomingWeeks','weekHeight','fontWeight','theme','cameraFit','showCamera','hidePrivateEvents','nightEnabled','nightStart','nightEnd','nightBrightness','paperTexture','timeToolsEnabled','visualTimersEnabled'];
 const binaryKeys=new Set(['showCamera','hidePrivateEvents','nightEnabled','paperTexture','timeToolsEnabled','visualTimersEnabled','castEnabled']);
 keys.push('castEnabled','castBaseUrl');
+const restartButton=document.createElement('button');restartButton.id='restart-display';restartButton.type='button';restartButton.className='icon-button';restartButton.title='Restart display services';restartButton.setAttribute('aria-label',restartButton.title);restartButton.innerHTML='<i data-lucide="rotate-cw"></i>';
+$('save').before(restartButton);
+const restartDialog=document.createElement('dialog');restartDialog.id='restart-dialog';restartDialog.setAttribute('aria-labelledby','restart-heading');
+restartDialog.innerHTML='<div class="dialog-heading"><h2 id="restart-heading">Restart display services?</h2><button id="cancel-restart" type="button" class="icon-button view-close" title="Cancel" aria-label="Cancel restart"><i data-lucide="x"></i></button></div><p>The browser, dashboard/Cast service and camera bridge will restart. Active casts end and unsaved settings are lost. The computer will not reboot; the USB touchscreen is not reset.</p><p id="restart-status" role="status"></p><div class="restart-actions"><button id="confirm-restart" type="button" class="primary"><i data-lucide="rotate-cw"></i>Restart services</button></div>';
+document.body.append(restartDialog);
+const localRecovery=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+restartButton.disabled=!localRecovery;if(!localRecovery)restartButton.title='Restart from localhost on this display';
+let restartBusy=false;
+restartButton.onclick=()=>{if(!restartBusy){$('restart-status').textContent='';restartDialog.showModal();$('cancel-restart').focus();}};
+$('cancel-restart').onclick=()=>restartDialog.close();
+restartDialog.addEventListener('cancel',event=>{if(restartBusy)event.preventDefault();});
+$('confirm-restart').onclick=async()=>{
+  if(restartBusy)return;
+  restartBusy=true;restartButton.disabled=$('confirm-restart').disabled=$('cancel-restart').disabled=true;
+  $('restart-status').textContent='Scheduling restart...';
+  try{
+    const response=await fetch('/api/recovery',{method:'POST',headers:{'Content-Type':'application/json','X-Kitchen-Request':'1'},body:JSON.stringify({confirm:true})});
+    const value=await response.json();if(!response.ok)throw Error(value.error||'Restart could not be scheduled.');
+    $('restart-status').textContent='Restarting services...';
+    const until=Date.now()+90000;
+    const waitForService=async()=>{
+      try{
+        const result=await fetch('/api/recovery',{cache:'no-store',signal:AbortSignal.timeout(3000)});
+        if(result.ok&&(await result.json()).generation!==value.generation){location.reload();return;}
+      }catch{}
+      if(Date.now()<until){setTimeout(waitForService,1500);return;}
+      $('restart-status').textContent='Services have not returned yet. Check the display with a keyboard or retry later.';
+      restartBusy=false;restartButton.disabled=$('confirm-restart').disabled=$('cancel-restart').disabled=false;
+    };
+    setTimeout(waitForService,4000);
+  }catch(error){
+    $('restart-status').textContent=error.message;restartBusy=false;restartButton.disabled=$('confirm-restart').disabled=$('cancel-restart').disabled=false;
+  }
+};
 const calendarIcons=[['calendar-days','Calendar'],['user-round','Person'],['users-round','Family'],['briefcase-business','Work'],['house','Home'],['graduation-cap','School'],['heart','Care'],['stethoscope','Medical'],['party-popper','Celebration'],['plane','Travel'],['dumbbell','Exercise'],['music','Music'],['utensils','Meals'],['car','Car'],['baby','Child'],['clapperboard','Production'],['wrench','Maintenance'],['sun','Holiday']];
 function visualTimerRow(timer){
   const row=document.createElement('details');row.className='visual-setting';row.dataset.id=timer.id;
