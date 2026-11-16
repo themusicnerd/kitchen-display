@@ -43,4 +43,5 @@ targets=T.activityTargets(config,'Weekday','lunch-in',new Date('2026-07-10T08:00
 assert.equal(targets[0].at,new Date('2026-07-10T09:00:00+10:00').getTime());
 targets=T.activityTargets({...config,timezone:'Australia/Perth'},'Weekday','lunch-in',new Date('2026-11-09T08:00:00+08:00'));
 assert.equal(targets[0].at,new Date('2026-11-09T09:00:00+08:00').getTime());
-console.log('PASS: timer/stopwatch arithmetic, formatting, weekdays, variants and timezone/DST handling');
+assert.equal(T.overdueText(0),'+00:00');assert.equal(T.overdueText(999),'+00:00');assert.equal(T.overdueText(65000),'+01:05');assert.equal(T.overdueText(3600000),'+60:00');
+console.log('PASS: timer/stopwatch arithmetic, overdue formatting, weekdays, variants and timezone/DST handling');

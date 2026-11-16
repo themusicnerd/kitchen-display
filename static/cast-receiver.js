@@ -19,11 +19,15 @@
       return;
     }
     const timer=snapshot.timer,remaining=Math.max(0,timer.status==='running'?timer.endAt-(Date.now()+offset):timer.remainingMs);
+    const deadline=timer.status==='finished'?timer.finishedAt:timer.status==='running'?timer.endAt:null;
+    const overdue=Number.isFinite(deadline)&&Date.now()+offset>=deadline;
     const hour=KitchenTiming.hourFraction(remaining),minute=KitchenTiming.minuteFraction(remaining),dial=$('activity-dial');
-    $('activity-focus-remaining').textContent=KitchenTiming.countdownText(remaining);
+    dial.dataset.overdue=String(overdue);dial.dataset.acknowledged=String(!!timer.acknowledged);
+    $('activity-focus-remaining').textContent=overdue?KitchenTiming.overdueText(Date.now()+offset-deadline):KitchenTiming.countdownText(remaining);
+    $('activity-focus-remaining').setAttribute('aria-label',overdue?'Time since this timer finished':'Time remaining');
     dial.style.setProperty('--pie-angle',(hour*360).toFixed(3)+'deg');dial.style.setProperty('--minute-angle',(minute*360).toFixed(3)+'deg');
     $('activity-pie').setAttribute('aria-valuenow',(hour*60).toFixed(1));$('activity-minute-ring').setAttribute('aria-valuenow',(minute*60).toFixed(1));
-    $('tv-state').textContent=timer.status==='paused'?'Paused':timer.status==='idle'?'Ready':remaining?'':'Time reached';
+    $('tv-state').textContent=overdue?'Since finished':timer.status==='paused'?'Paused':timer.status==='idle'?'Ready':remaining?'':'Time reached';
   }
   function end(){
     stopped=true;snapshot=null;$('tv-timer').hidden=true;$('tv-message').hidden=false;$('tv-message').textContent='Timer sharing ended';

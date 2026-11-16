@@ -81,7 +81,11 @@ async function until(page,predicate){for(let i=0;i<150;i++){if(await page.evalua
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt-1800000);
     await until(page,()=>document.getElementById('activity-dial').dataset.minuteFraction==='1');
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt+1);await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='0');
-    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'00:00');assert.equal(await page.locator('#activity-dial').getAttribute('data-minute-fraction'),'0');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'+00:00');assert.equal(await page.locator('#activity-dial').getAttribute('data-minute-fraction'),'0');
+    assert(await page.locator('#activity-pie').isHidden());assert(await page.locator('#activity-minute-ring').isHidden());
+    await page.evaluate(()=>Date.now=()=>window.focusedTestAt+65000);await until(page,()=>document.getElementById('activity-focus-remaining').textContent==='+01:05');
+    assert.equal(await page.locator('#activity-dial').evaluate(el=>getComputedStyle(el).animationName),'overdue-pulse');
+    await page.screenshot({path:path.join(__dirname,'../test-results/activity-overdue.png')});
     await page.evaluate(()=>Date.now=window.activityOriginalNow);
     await page.locator('#activity-unfocus').click();assert(await page.locator('#activity-timers').isVisible());
     assert.equal(await page.locator('.activity-expand').first().evaluate(el=>el===document.activeElement),true,'Return restores keyboard focus');
@@ -101,9 +105,12 @@ async function until(page,predicate){for(let i=0;i<150;i++){if(await page.evalua
     await first.locator('.timer-toggle').click();await page.locator('#add-timer').click();
     const second=page.locator('.timer-row').nth(1);await second.locator('.timer-minutes').fill('0');await second.locator('.timer-minutes').dispatchEvent('change');await second.locator('.timer-seconds').fill('5');await second.locator('.timer-seconds').dispatchEvent('change');await second.locator('.timer-toggle').click();
     await until(page,()=>document.querySelector('.timer-row').dataset.status==='finished');
+    assert.match(await first.locator('.timer-remaining').textContent(),/^\+/);
+    assert(Number.isFinite(await page.evaluate(()=>JSON.parse(localStorage.getItem('kitchen-time-tools')).timers[0].finishedAt)));
     assert.equal(await second.getAttribute('data-status'),'running','Timers run independently');
     await second.locator('.timer-toggle').click();assert.equal(await second.getAttribute('data-status'),'paused');
     await first.locator('.timer-ack').click();await until(page,()=>document.getElementById('timer-badge').hidden);
+    assert.equal(await first.getAttribute('data-alert'),'false');
     await page.reload();await until(page,()=>document.getElementById('clock').textContent.length>0);await page.locator('#open-time-tools').click();
     assert.equal(await page.locator('.timer-row').nth(1).getAttribute('data-status'),'paused','Paused timer survives reload');
     await page.locator('.timer-row').nth(1).locator('.timer-extend').click();await page.locator('.timer-row').nth(1).locator('.timer-toggle').click();assert.equal(await page.locator('.timer-row').nth(1).getAttribute('data-status'),'running');

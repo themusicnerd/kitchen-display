@@ -9,6 +9,7 @@
   function remaining(timer,now=Date.now()){
     return Math.max(0,timer.status==='running'?timer.endAt-now:timer.remainingMs);
   }
+  function overdueText(ms){return '+'+countdownText(Math.floor(Math.max(0,ms)/1000)*1000);}
   function elapsed(stopwatch,now=Date.now()){
     return stopwatch.elapsedMs+(stopwatch.startedAt===null?0:Math.max(0,now-stopwatch.startedAt));
   }
@@ -43,6 +44,6 @@
     const today=build(0);
     return today.length&&today.every(timer=>timer.at<=now.getTime())?build(1):today;
   }
-  const api={MAX_TIMER,hourFraction,minuteFraction,countdownText,remaining,elapsed,durationText,activityTargets,localParts};
+  const api={MAX_TIMER,hourFraction,minuteFraction,countdownText,overdueText,remaining,elapsed,durationText,activityTargets,localParts};
   if(typeof module!=='undefined')module.exports=api;else root.KitchenTiming=api;
 })(globalThis);

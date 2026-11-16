@@ -86,6 +86,12 @@ const os=require('node:os');
     timer={...timer,status:'paused',endAt:null,remainingMs:45000};
     for(let i=0;i<60&&await tv.locator('#tv-state').textContent()!=='Paused';i++)await tv.waitForTimeout(100);
     assert.equal(await tv.locator('#activity-focus-remaining').textContent(),'00:45');
+    timer={...timer,status:'finished',finishedAt:Date.now()-65000,remainingMs:0,acknowledged:false};
+    for(let i=0;i<60&&!await tv.locator('#activity-focus-remaining').textContent().then(text=>text.startsWith('+'));i++)await tv.waitForTimeout(100);
+    assert.match(await tv.locator('#activity-focus-remaining').textContent(),/^\+01:/);assert(await tv.locator('#activity-pie').isHidden());assert(await tv.locator('#activity-minute-ring').isHidden());
+    assert.equal(await tv.locator('#activity-dial').evaluate(el=>getComputedStyle(el).animationName),'overdue-pulse');
+    await tv.screenshot({path:path.join(__dirname,'../test-results/cast-overdue.png')});
+    await tv.emulateMedia({reducedMotion:'reduce'});assert.equal(await tv.locator('#activity-dial').evaluate(el=>getComputedStyle(el).animationName),'none');await tv.emulateMedia({reducedMotion:'no-preference'});
     timer={name:'Stopwatch',kind:'stopwatch',status:'running',elapsedMs:65000,startedAt:Date.now(),endAt:null,remainingMs:0,laps:[10000,30000]};
     for(const size of [{width:1920,height:1080},{width:1280,height:720},{width:960,height:540},{width:390,height:844}]){
       await tv.setViewportSize(size);await tv.goto(base+'/cast/timer#'+'a'.repeat(43));await tv.locator('#tv-stopwatch-time').waitFor({state:'visible'});

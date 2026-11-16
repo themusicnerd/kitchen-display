@@ -12,6 +12,9 @@
       if(s&&Number.isFinite(s.elapsedMs)&&s.elapsedMs>=0&&(s.startedAt===null||Number.isFinite(s.startedAt)))state.stopwatch={elapsedMs:s.elapsedMs,startedAt:s.startedAt,laps:(Array.isArray(s.laps)?s.laps:[]).filter(Number.isFinite).slice(0,100)};
     }
   }catch{}
+  let migratedFinish=false;
+  for(const timer of state.timers)if(timer.status==='finished'&&!Number.isFinite(timer.finishedAt)){timer.finishedAt=Date.now();migratedFinish=true;}
+  if(migratedFinish)save();
   const dialog=document.createElement('dialog');dialog.id='time-tools';dialog.className='time-tools';dialog.setAttribute('aria-labelledby','tools-heading');
   dialog.innerHTML='<div class="tools-shell"><header class="tools-heading"><h2 id="tools-heading">Timers</h2><button id="timer-sound" class="icon-button" type="button" title="Mute timer sound" aria-label="Mute timer sound"></button><button id="close-time-tools" class="icon-button" type="button" title="Back to calendar" aria-label="Back to calendar"><i data-lucide="x"></i></button></header><div class="tools-tabs" role="tablist" aria-label="Clock views"><button id="tab-timers" role="tab" aria-controls="pane-timers" type="button">Timers</button><button id="tab-stopwatch" role="tab" aria-controls="pane-stopwatch" type="button">Stopwatch</button><button id="tab-activities" role="tab" aria-controls="pane-activities" type="button">Get ready</button></div><section id="pane-timers" role="tabpanel" aria-labelledby="tab-timers"><div class="tools-actions"><button id="add-timer" type="button" class="secondary"><i data-lucide="plus"></i>Add timer</button></div><div id="timer-list"></div></section><section id="pane-stopwatch" role="tabpanel" aria-labelledby="tab-stopwatch" hidden><output id="stopwatch-time" class="stopwatch-time">00:00:00.00</output><div class="stopwatch-controls"><button id="stopwatch-toggle" class="icon-button" type="button"></button><button id="stopwatch-lap" class="icon-button" type="button" title="Record lap" aria-label="Record lap"><i data-lucide="flag"></i></button><button id="stopwatch-reset" class="icon-button" type="button" title="Reset stopwatch" aria-label="Reset stopwatch"><i data-lucide="rotate-ccw"></i></button></div><ol id="stopwatch-laps" class="stopwatch-laps"></ol></section><section id="pane-activities" role="tabpanel" aria-labelledby="tab-activities" hidden><div class="activity-options"><label>Activity<select id="activity-group"></select></label><div id="lunch-options" class="tools-tabs" role="group" aria-label="Lunch option"><button type="button" data-lunch="lunch-out">Lunch out</button><button type="button" data-lunch="lunch-in">Lunch at home</button></div></div><div id="activity-timers" class="activity-timers"></div></section><p id="tools-status" class="tools-status" role="status"></p></div>';
   document.body.append(dialog);
@@ -91,7 +94,7 @@
       row.querySelector('.timer-toggle').onclick=()=>{
         if(inputs.some(input=>!input.reportValidity())||inputs.every(input=>!Number(input.value))){el('tools-status').textContent='Choose a duration greater than zero.';return;}
         unlockSound();const now=Date.now();
-        if(timer.status==='running'){timer.remainingMs=T.remaining(timer,now);timer.status=timer.remainingMs?'paused':'finished';timer.endAt=null;}
+        if(timer.status==='running'){timer.remainingMs=T.remaining(timer,now);timer.status=timer.remainingMs?'paused':'finished';if(!timer.remainingMs)timer.finishedAt=timer.endAt;timer.endAt=null;}
         else{timer.remainingMs=timer.remainingMs||timer.durationMs;timer.endAt=now+timer.remainingMs;timer.status='running';timer.acknowledged=false;}
         save();tick();
       };
@@ -155,9 +158,10 @@
   function tick(){
     const now=Date.now();let changed=false;
     for(const timer of state.timers){
-      if(timer.status==='running'&&T.remaining(timer,now)===0){Object.assign(timer,{status:'finished',remainingMs:0,endAt:null,acknowledged:false});changed=true;}
+      if(timer.status==='running'&&T.remaining(timer,now)===0){Object.assign(timer,{status:'finished',finishedAt:timer.endAt,remainingMs:0,endAt:null,acknowledged:false});changed=true;}
       const row=el('timer-list').querySelector(`[data-timer="${timer.id}"]`);if(!row)continue;
-      row.querySelector('.timer-remaining').textContent=T.durationText(Math.ceil(T.remaining(timer,now)/1000)*1000);
+      row.querySelector('.timer-remaining').textContent=timer.status==='finished'?T.overdueText(now-timer.finishedAt):T.durationText(Math.ceil(T.remaining(timer,now)/1000)*1000);
+      row.dataset.alert=String(timer.status==='finished'&&!timer.acknowledged);
       row.dataset.status=timer.status;row.querySelector('.timer-state').textContent={idle:'Ready',running:'Running',paused:'Paused',finished:timer.acknowledged?'Finished':'Time is up'}[timer.status];
       glyph(row.querySelector('.timer-toggle'),timer.status==='running'?'pause':'play',timer.status==='running'?'Pause timer':'Start timer');
       row.querySelector('.timer-ack').hidden=timer.status!=='finished'||timer.acknowledged;
@@ -173,7 +177,10 @@
       if(view==='activities'&&focusedActivity){
         const remaining=Math.max(0,focusedActivity.at-now),fraction=T.hourFraction(remaining);
         const minute=T.minuteFraction(remaining);
-        el('activity-focus-remaining').textContent=T.countdownText(remaining);
+        const overdue=now>=focusedActivity.at;
+        el('activity-dial').dataset.overdue=String(overdue);
+        el('activity-focus-remaining').textContent=overdue?T.overdueText(now-focusedActivity.at):T.countdownText(remaining);
+        el('activity-focus-remaining').setAttribute('aria-label',overdue?'Time since this timer finished':'Time remaining');
         el('activity-dial').style.setProperty('--pie-angle',(fraction*360).toFixed(3)+'deg');
         el('activity-dial').dataset.fraction=String(fraction);
         el('activity-dial').style.setProperty('--minute-angle',(minute*360).toFixed(3)+'deg');
@@ -185,7 +192,7 @@
       glyph(el('stopwatch-toggle'),state.stopwatch.startedAt===null?'play':'pause',state.stopwatch.startedAt===null?'Start stopwatch':'Pause stopwatch');
       el('stopwatch-lap').disabled=state.stopwatch.startedAt===null||state.stopwatch.laps.length>=100;
       if(view==='activities')for(const row of el('activity-timers').querySelectorAll('[data-at]')){
-        const remaining=Math.max(0,Number(row.dataset.at)-now);row.querySelector('output').textContent=T.durationText(Math.ceil(remaining/1000)*1000);row.querySelector('progress').value=remaining;row.querySelector('.activity-state').textContent=remaining>3600000?'More than an hour':remaining?'Time remaining':'Time reached';row.dataset.reached=String(!remaining);
+        const at=Number(row.dataset.at),remaining=Math.max(0,at-now);row.querySelector('output').textContent=remaining?T.durationText(Math.ceil(remaining/1000)*1000):T.overdueText(now-at);row.querySelector('progress').value=remaining;row.querySelector('progress').hidden=!remaining;row.querySelector('.activity-state').textContent=remaining>3600000?'More than an hour':remaining?'Time remaining':'Since finished';row.dataset.reached=String(!remaining);row.dataset.alert=String(!remaining);
       }
     }
     glyph(el('timer-sound'),state.sound?'volume-2':'volume-x',state.sound?'Mute timer sound':'Enable timer sound');
@@ -213,7 +220,7 @@
     }
     if(source.kind==='countdown'){
       const timer=state.timers.find(t=>t.id===source.id);
-      return timer&&config.timeToolsEnabled!==false?{name:timer.name,status:timer.status,endAt:timer.endAt,remainingMs:T.remaining(timer)}:null;
+      return timer&&config.timeToolsEnabled!==false?{name:timer.name,status:timer.status,endAt:timer.endAt,remainingMs:T.remaining(timer),finishedAt:timer.finishedAt,acknowledged:!!timer.acknowledged}:null;
     }
     const timer=(config.visualTimers||[]).find(t=>t.id===source.id&&t.enabled);
     return timer&&config.visualTimersEnabled!==false?{name:timer.name,status:'running',endAt:source.at,remainingMs:Math.max(0,source.at-Date.now())}:null;

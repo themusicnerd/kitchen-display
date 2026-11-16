@@ -164,3 +164,13 @@ body[data-theme=light][data-paper=true] .time-tools{background:#f8f8f6 url('/ass
 @container (max-width:180px){#activity-focus-remaining{font-size:18px}.dial-mark{font-size:8px}}
 @container (max-width:100px){#activity-focus-remaining{font-size:10px}.dial-mark{display:none}}
 @media(max-width:700px){#close-cameras{top:18px;right:18px}.cameras.expanded{padding-top:84px}.activity-focus-heading h3{font-size:22px}}
+@keyframes overdue-pulse{0%,100%{background-color:#450c16}50%{background-color:#a51c32}}
+.activity-dial[data-overdue=true],.timer-row[data-alert=true],.activity-timer[data-alert=true]{background:#450c16;animation:overdue-pulse 2.8s ease-in-out infinite;border-radius:6px;color:#fff}
+.activity-dial[data-overdue=true] .activity-pie,.activity-dial[data-overdue=true] .activity-minute-ring,.activity-dial[data-overdue=true] .dial-mark{display:none}
+.activity-dial[data-overdue=true] output,.timer-row[data-alert=true] output,.activity-timer[data-alert=true] output{color:#fff}
+.timer-row[data-alert=true] .timer-remaining{color:#fff}
+.timer-row[data-alert=true],.activity-timer[data-alert=true]{padding-left:12px;padding-right:12px}
+.activity-timer[data-reached=true]{opacity:1}
+.activity-dial[data-overdue=true][data-acknowledged=true]{animation:none;background:transparent;color:var(--ink)}
+.activity-dial[data-overdue=true][data-acknowledged=true] output{color:var(--ink)}
+@media(prefers-reduced-motion:reduce){.activity-dial[data-overdue=true],.timer-row[data-alert=true],.activity-timer[data-alert=true]{animation:none}}

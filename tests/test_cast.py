@@ -142,6 +142,16 @@ class CastTests(unittest.TestCase):
         with self.assertRaises(C.CastError):
             C.timer_snapshot(self.conf, {'kind': 'activity', 'id': 'missing', 'at': time.time()*1000})
 
+    def test_finished_timer_keeps_finish_time_and_acknowledgement(self):
+        ended = time.time()*1000-65000
+        source = {'kind': 'countdown', 'id': 'finished'}
+        value = C.timer_snapshot(self.conf, source, {'status': 'finished', 'remainingMs': 0, 'finishedAt': ended, 'acknowledged': True})
+        self.assertEqual(value['finishedAt'], ended)
+        self.assertTrue(value['acknowledged'])
+        for invalid in (-1, float('nan'), time.time()*1000+120000):
+            with self.assertRaises(C.CastError):
+                C.timer_snapshot(self.conf, source, {'status': 'finished', 'remainingMs': 0, 'finishedAt': invalid})
+
     def test_stopwatch_snapshot_and_validation(self):
         source = {'kind': 'stopwatch', 'id': 'stopwatch'}
         timer = {'status': 'running', 'elapsedMs': 65000, 'laps': [10000, 30000]}

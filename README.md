@@ -87,6 +87,13 @@ touch calibration. It can clear a stuck browser or stale app connections, but is
 not a fix for a disconnected touchscreen, TV/network problems or camera faults.
 If the browser cannot respond to taps, use a mouse/keyboard to open Settings.
 
+Firefox pages include a guarded tap fallback for touch presses that do not become
+native clicks. It applies only to buttons, links and checkboxes/radios, not text
+fields or native selects. Native clicks take precedence; late touch clicks are
+deduplicated. Movement, scrolling, multiple fingers, cancellation and long presses
+do not activate controls. Mouse behaviour and other browsers are unchanged. This
+is an app workaround, not a USB driver or touchscreen calibration change.
+
 ## Cameras
 
 In Settings > Cameras, add up to four cameras. Each has a name, enabled switch,
@@ -137,6 +144,14 @@ background. The theme shortcut persists in this browser; changing the default
 Appearance in Settings takes precedence when that change reaches the display.
 
 ## Timers and Get Ready
+
+Expired countdowns show `+MM:SS`, counting time since the deadline, with a slow
+red background pulse instead of the hour pie or minute ring. This applies to
+normal timers, activity countdowns and Cast receivers. Dismissing a normal timer
+stops its alert/pulse but leaves the overtime clock visible until reset. Reduced
+motion uses a steady red background. Finish times persist across reloads; timers
+saved as finished by older versions had no finish timestamp, so their overtime
+clock starts on the first reload after upgrading.
 
 Touch the large clock to open up to eight independent countdown timers and a
 stopwatch. Timers have editable names/durations, pause/resume, reset, add-one-minute,

@@ -133,9 +133,15 @@ def timer_snapshot(conf, source, timer=None):
     if status not in ('idle', 'running', 'paused', 'finished'):
         raise CastError('Invalid timer state.')
     remaining = finite_number(timer.get('remainingMs'), 100*3600000)
+    finished_at = None
+    if status == 'finished':
+        finished_at = finite_number(timer.get('finishedAt', now), now+60000)
+        if finished_at < now-365*86400000:
+            raise CastError('Invalid timer finish time.')
     return {'name': str(timer.get('name', 'Timer')).strip()[:60] or 'Timer', 'status': status,
             'endAt': now+remaining if status == 'running' else None,
-            'remainingMs': remaining, 'kind': kind}
+            'remainingMs': remaining, 'kind': kind, 'finishedAt': finished_at,
+            'acknowledged': bool(timer.get('acknowledged'))}
 
 
 class CastManager:
