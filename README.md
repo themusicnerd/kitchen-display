@@ -7,7 +7,8 @@ cameras or cloud accounts; add only the connections you need.
 
 ## Install
 
-Tested on Ubuntu 24.04, Python 3.12, Linux x86_64 with Firefox and user systemd.
+Tested on Ubuntu 24.04 / Python 3.12 and Ubuntu 26.04 / Python 3.14,
+Linux x86_64 with Firefox and user systemd.
 The installer also supports the official Linux arm64 go2rtc build; that target
 has not been tested on hardware. A desktop login session is required.
 
@@ -243,6 +244,28 @@ setup is restricted to localhost. Selected calendar names/events are intentional
 visible to authenticated display users. See [SECURITY.md](SECURITY.md).
 
 ## Services and Recovery
+
+### After an Ubuntu Release Upgrade
+
+A release upgrade can change `/usr/bin/python3` to a new Python minor version.
+An existing virtual environment can then execute the new interpreter while its
+dependencies remain under the old `lib/pythonX.Y/site-packages`, causing startup
+errors such as `ModuleNotFoundError: icalendar`. Restarting services alone will
+not reinstall those packages. With the new release's `python3-venv` installed:
+
+```bash
+systemctl --user stop kitchen-display-browser.service kitchen-display.service
+python3 -m venv --upgrade .venv
+.venv/bin/python -m pip install -r requirements.lock
+.venv/bin/python -m pip check
+.venv/bin/python -m unittest discover -s tests -q
+systemctl --user restart kitchen-display.service kitchen-display-browser.service
+```
+
+Run from the checkout as the desktop user. Do not copy old site-packages between
+Python versions or use sudo pip. Calendar accounts, camera credentials and saved
+settings are outside the venv and should not be removed. Virtual-environment
+directories, versioned replacements and backups are excluded from Git.
 
 ```bash
 systemctl --user restart kitchen-display kitchen-cameras
