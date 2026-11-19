@@ -14,6 +14,7 @@ FILES = [
     'static/cast-receiver.css', 'tests/test_cast.py', 'tests/cast-browser.cjs',
     'tests/camera-hold-browser.cjs', 'recovery.py', 'tests/test_recovery.py',
     'tests/recovery-browser.cjs', 'static/touch.js', 'tests/touch-browser.cjs',
+    'tests/test_calendar_status.py', 'tests/calendar-status-browser.cjs',
     'requirements.txt', 'requirements.lock', '.gitignore', 'ACCOUNT_SETUP.md',
     'SECURITY.md', 'NOTICE.md', 'LICENSE', 'prepare-public.py',
     'static/index.html', 'static/settings.html', 'static/style.css', 'static/app.js',

@@ -48,7 +48,7 @@ speakers/groups are excluded. The TV and server must be reachable on the trusted
 LAN, including server TCP port 8090 and Cast control TCP port 8009. Client/AP
 isolation can block discovery or loading. Discovery is not AirPlay or Miracast.
 
-Casting works from the Firefox kiosk via PyChromecast, not a browser Cast SDK.
+Casting works from the kiosk browser via PyChromecast, not a browser Cast SDK.
 It launches the published third-party DashCast receiver (app ID 84912283), then
 loads a local dedicated timer page. TV internet access is needed for DashCast and
 Google's Cast receiver framework. This avoids registering your own receiver but
@@ -183,6 +183,28 @@ installations start with no visual timers. Settings can enable/disable each view
 
 ## Kiosk Touch
 
+Firefox remains the default launcher. An installed Chromium can be selected for
+the dedicated dashboard when Firefox touch activation is unreliable. Create
+`~/.config/systemd/user/kitchen-display-browser.service.d/browser.conf` containing:
+
+```ini
+[Service]
+Environment=KITCHEN_BROWSER=chromium
+```
+
+Then run `systemctl --user daemon-reload` and restart
+`kitchen-display-browser.service`. Chromium uses a separate mode-700 profile at
+`~/snap/chromium/common/kitchen-display-kiosk`, disables pinch zoom, and uses native
+Wayland on a Wayland desktop. It does not disable the browser sandbox. Saved
+calendar/camera connections remain on the server; browser-local timers, visibility
+filters and theme overrides are not automatically migrated. The Firefox profile
+is retained. Set the environment value back to `firefox` to return to it.
+Preview without opening a browser or modifying a profile:
+
+```bash
+KITCHEN_BROWSER=chromium bash start-kiosk.sh --dry-run
+```
+
 The dedicated kiosk profile locks Firefox at 100% zoom and disables pinch zoom;
 vertical touch scrolling remains enabled. `configure-kiosk.py` preserves other
 `user.js` preferences and backs up saved site zoom before resetting it. It runs at
@@ -197,6 +219,21 @@ to allow panning without pinch zoom. Firefox settings are documented in the
 [Mozilla preference source](https://github.com/mozilla-firefox/firefox/blob/main/modules/libpref/init/StaticPrefList.yaml).
 
 ## Calendars
+
+Settings shows connection state and last successful sync time beside each account
+and calendar, refreshed every 15 seconds without replacing unsaved form edits.
+The dashboard legend also has connection-status dots and links to connection
+settings when a source needs attention. Connected means the latest fetch
+succeeded; cached/offline, sign-in required, provider setup and permissions errors
+are shown separately. No provider error descriptions, tokens or feed URLs are
+included in the status API.
+
+Reconnect reopens the existing account's provider sign-in on localhost. Sign in
+with the same account: a different identity is rejected rather than silently
+replacing calendar links. Existing calendar selections, names, colours and icons
+are retained. Successful sign-in requests an immediate refresh. Retry sync queues
+a fresh calendar fetch without removing credentials; it is not a substitute for
+sign-in when a provider has expired or revoked access.
 
 Connect multiple Google and Microsoft accounts, select their calendars, then
 customise names, colours and icons under Calendars. Account access is read-only.

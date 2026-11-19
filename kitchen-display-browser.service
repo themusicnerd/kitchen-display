@@ -1,5 +1,5 @@
 [Unit]
-Description=Kitchen display Firefox kiosk
+Description=Kitchen display kiosk browser
 After=graphical-session.target kitchen-display.service
 PartOf=graphical-session.target
 Requires=kitchen-display.service

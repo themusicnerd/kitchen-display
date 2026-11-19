@@ -152,7 +152,11 @@ function render() {
     const visible=!hiddenCalendars.has(source.id);
     item.setAttribute('aria-pressed',String(visible));item.title=`${visible?'Hide':'Show'} ${source.name}`;
     const glyph=calendarIcon(source.id);glyph.style.color=source.color;
-    item.append(glyph,element('span','',source.name));item.onclick=()=>toggleCalendar(source.id);$('legend').append(item);
+    const status=calendar.sources.find(s=>s.id===source.id);
+    const state=status?.issue==='auth'?'Sign-in required':status?.issue==='setup'?'Provider setup required':status?.state==='ready'?'Connected':status?'Connection needs attention':'Checking connection';
+    const dot=element('span','connection-dot');dot.dataset.level=status?.state==='ready'?'ok':status?.issue==='auth'||status?.issue==='setup'?'error':status?'warning':'muted';dot.setAttribute('aria-hidden','true');
+    item.title+=' · '+state;
+    item.append(glyph,element('span','',source.name),dot);item.onclick=()=>toggleCalendar(source.id);$('legend').append(item);
   }
   $('show-calendars').disabled=!enabledSources.some(s=>hiddenCalendars.has(s.id));
   $('hide-calendars').disabled=!enabledSources.some(s=>!hiddenCalendars.has(s.id));
@@ -169,8 +173,10 @@ function render() {
   updateUpcomingMonth();
   requestAnimationFrame(fitUpcoming);
   const enabled=config.calendars.filter(s=>s.enabled&&s.configured);
-  const failed=calendar.sources.filter(s=>s.state!=='ready');
-  $('connection-state').textContent=enabled.length ? failed.map(s=>`${s.name}: ${s.state}`).join(' · ') : 'No calendars connected';
+  const activeIds=new Set(enabled.map(s=>s.id));
+  const failed=calendar.sources.filter(s=>activeIds.has(s.id)&&s.state!=='ready');
+  $('connection-state').textContent=enabled.length ? failed.length?failed.map(s=>`${s.name}: ${s.issue==='auth'?'Sign-in required':s.issue==='setup'?'Provider setup required':s.state}`).join(' · '):calendar.sources.length?'Calendars connected':'Checking calendar connections...' : 'No calendars connected';
+  if(failed.length){const link=element('a','connection-settings',failed.some(s=>s.issue==='auth')?'Reconnect':'Connection settings');link.href='/settings#connected-accounts';$('connection-state').append(document.createTextNode(' '),link);}
   icons();clock();updateNightMode();
 }
 async function update(){

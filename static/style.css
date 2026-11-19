@@ -40,6 +40,13 @@ body[data-theme=dark] .primary{color:#241a10}
 .account-status{font-size:14px;color:var(--muted);margin:14px 0;min-height:20px}
 .account-row{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding:18px 0}
 .account-row>div{flex:1;min-width:0;overflow-wrap:anywhere}
+.account-row>.account-actions{flex:0 1 auto;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.calendar-connection{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.calendar-link-status{font-size:14px;line-height:1.5;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}
+.calendar-link-status::before{content:'';display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:#8b8b8b}
+.calendar-link-status[data-level=ok]::before{background:#59bf89}.calendar-link-status[data-level=warning]::before{background:#e5ad55}.calendar-link-status[data-level=error]::before{background:#ed737c}
+.connection-dot{display:inline-block;width:7px;height:7px;flex-shrink:0;border-radius:50%;background:#8b8b8b}.connection-dot[data-level=ok]{background:#59bf89}.connection-dot[data-level=error]{background:#ed737c}.connection-dot[data-level=warning]{background:#e5ad55}
+.connection-settings{display:inline-block;color:var(--accent);padding:8px 0;margin-left:8px;min-height:36px}
 .account-provider-label{display:block;font-size:13px;color:var(--muted);margin-top:5px}
 #provider-setup{border-top:1px solid var(--line);margin-top:20px;padding:20px 0}
 #provider-setup summary{cursor:pointer;min-height:32px;color:var(--muted)}

@@ -1,6 +1,8 @@
 import importlib.util
 from pathlib import Path
 import sqlite3
+import os
+import subprocess
 import tempfile
 import unittest
 
@@ -10,6 +12,19 @@ spec.loader.exec_module(kiosk)
 
 
 class KioskTests(unittest.TestCase):
+    def test_browser_selection_and_touch_safe_chromium_flags(self):
+        script=Path(__file__).resolve().parents[1]/'start-kiosk.sh'
+        with tempfile.TemporaryDirectory() as directory:
+            env=dict(os.environ,HOME=directory,KITCHEN_BROWSER='chromium',XDG_SESSION_TYPE='wayland')
+            result=subprocess.run(['bash',str(script),'--dry-run'],env=env,text=True,capture_output=True,check=True)
+            self.assertIn('--disable-pinch',result.stdout);self.assertIn('--ozone-platform=wayland',result.stdout)
+            self.assertNotIn('--no-sandbox',result.stdout);self.assertNotIn('--disable-web-security',result.stdout)
+            self.assertFalse((Path(directory)/'snap').exists())
+            env['KITCHEN_BROWSER']='firefox'
+            self.assertIn('firefox --no-remote',subprocess.run(['bash',str(script),'--dry-run'],env=env,text=True,capture_output=True,check=True).stdout)
+            env['KITCHEN_BROWSER']='unknown'
+            self.assertEqual(subprocess.run(['bash',str(script),'--dry-run'],env=env,capture_output=True).returncode,2)
+
     def test_dry_run_idempotence_and_zoom_only_reset(self):
         with tempfile.TemporaryDirectory() as directory:
             profile = Path(directory)/'profile'

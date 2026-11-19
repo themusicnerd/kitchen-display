@@ -1,4 +1,5 @@
 from datetime import date
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -53,6 +54,25 @@ class OAuthTests(unittest.TestCase):
         oauth.PENDING['expired'] = {'provider': 'google', 'browser': 'nonce', 'created': time.time()-601}
         with self.assertRaises(ValueError):
             oauth.complete('google', {'state': ['expired']}, 'nonce')
+
+    def test_reconnect_preserves_identity_and_rejects_other_account(self):
+        oauth.save_apps({'google': {'clientId': 'example-client', 'clientSecret': 'test-secret'}})
+        account_id=hashlib.sha256(b'google:original').hexdigest()[:24]
+        original={'id':account_id,'provider':'google','email':'person@example.com','name':'Person','token':{'access_token':'old','refresh_token':'old-refresh'}}
+        oauth.store(oauth.ACCOUNTS,{account_id:original})
+        fake=MagicMock();fake.fetch_token.return_value={'access_token':'renewed','refresh_token':'new-refresh'}
+        for identity in ('wrong','original'):
+            url,nonce=oauth.begin('google',reconnect_id=account_id);params=parse_qs(urlsplit(url).query)
+            self.assertEqual(params['login_hint'],['person@example.com'])
+            fake.get.return_value.json.return_value={'sub':identity,'email':'person@example.com'}
+            with patch.object(oauth,'client',return_value=fake):
+                if identity=='wrong':
+                    with self.assertRaises(ValueError): oauth.complete('google',{'state':params['state'],'code':['test']},nonce)
+                    self.assertEqual(oauth.load(oauth.ACCOUNTS),{account_id:original})
+                else:
+                    self.assertEqual(oauth.complete('google',{'state':params['state'],'code':['test']},nonce),account_id)
+        self.assertEqual(list(oauth.load(oauth.ACCOUNTS)),[account_id])
+        self.assertEqual(oauth.load(oauth.ACCOUNTS)[account_id]['token']['access_token'],'renewed')
 
     def test_refresh_retains_refresh_token_and_stays_private(self):
         oauth.save_apps({'microsoft': {'clientId': 'native-client'}})

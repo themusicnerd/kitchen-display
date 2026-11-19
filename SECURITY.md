@@ -32,3 +32,9 @@ The service-restart API is loopback-only, requires the usual JSON/same-origin
 request header plus explicit confirmation, and accepts no service names or shell
 commands. A transient systemd user timer restarts a fixed appliance-service list
 outside the HTTP server's own unit. It uses no sudo and never reboots the host.
+
+Calendar status returns only selected-source IDs, a controlled issue category,
+state and last-success time, never provider error descriptions or tokens.
+Reconnect uses the existing provider/account identity, with the same localhost,
+PKCE, state and browser-cookie protections as initial sign-in. A different account
+chosen during reconnect is rejected before replacing stored credentials.

@@ -1,9 +1,61 @@
 (()=>{
   const byId=id=>document.getElementById(id);
-  let apps, selectedAccount;
+  let apps, selectedAccount, accountsList=[], connectionSources=[], retryRequestedAt=0;
   const make=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;};
   async function read(url){const response=await fetch(url);const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data;}
   async function post(url,body){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-Kitchen-Request':'1'},body:JSON.stringify(body)});const data=await response.json();if(!response.ok)throw Error(data.error||'Request failed');return data;}
+  function connectionText(sources){
+    const enabled=sources.filter(s=>s.state!=='disabled');
+    if(!sources.length)return {text:'No calendars selected',level:'muted'};
+    if(!enabled.length)return {text:'Disabled',level:'muted'};
+    let text='Checking connection',level='muted';
+    if(enabled.some(s=>s.issue==='auth')){text='Sign-in required';level='error';}
+    else if(enabled.some(s=>s.issue==='setup')){text='Provider setup required';level='error';}
+    else if(enabled.some(s=>s.issue==='permission')){text='Calendar access denied';level='error';}
+    else if(enabled.every(s=>s.state==='ready')){text='Connected';level='ok';}
+    else if(enabled.some(s=>s.state==='offline - cached events')){text='Offline - cached events';level='warning';}
+    else if(enabled.some(s=>s.state==='refresh failed'||s.state==='not connected')){text='Connection failed';level='warning';}
+    const times=enabled.map(s=>s.lastSuccess).filter(Number.isFinite);
+    if(times.length){const timestamp=Math.min(...times);text+=' · Last synced '+new Intl.DateTimeFormat('en-AU',{timeZone:config?.timezone||'Australia/Sydney',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}).format(new Date(timestamp*1000));}
+    if(level==='error'&&enabled.some(s=>s.state==='offline - cached events'))text+=' · Showing cached events';
+    return {text,level};
+  }
+  function paintStatus(node,sources){const status=connectionText(sources);node.textContent=status.text;node.dataset.level=status.level;}
+  async function reconnect(account,button){
+    button.disabled=true;
+    try{const data=await post('/api/accounts/connect',{accountId:account.id});window.location.assign(data.url);}
+    catch(error){byId('account-status').textContent=error.message;button.disabled=false;}
+  }
+  async function retrySync(button){
+    button.disabled=true;
+    try{retryRequestedAt=Date.now()/1000;await post('/api/refresh',{});byId('account-status').textContent='Retrying calendar sync...';setTimeout(refreshConnections,2000);}
+    catch(error){byId('account-status').textContent=error.message;}
+    finally{setTimeout(()=>button.disabled=false,2000);}
+  }
+  function renderConnections(){
+    for(const row of document.querySelectorAll('.account-row[data-account-id]'))paintStatus(row.querySelector('.calendar-link-status'),connectionSources.filter(s=>s.accountId===row.dataset.accountId));
+    for(const row of document.querySelectorAll('.calendar-source')){
+      const item=connectionSources.find(s=>s.id===row.dataset.id),node=row.querySelector('.calendar-link-status'),button=row.querySelector('.calendar-reconnect');
+      if(!node||!button)continue;
+      if(item)paintStatus(node,[item]);else{node.textContent='Not saved';node.dataset.level='muted';}
+      const account=accountsList.find(a=>a.id===row.dataset.accountId);
+      button.disabled=item?.state==='disabled';button.title=account?'Reconnect this calendar account':'Retry calendar sync';button.setAttribute('aria-label',button.title);
+      const action=account?'log-in':'refresh-cw';
+      if(button.dataset.action!==action){button.dataset.action=action;button.innerHTML='<i data-lucide="'+action+'"></i>';window.lucide?.createIcons();}
+      button.onclick=()=>account?reconnect(account,button):retrySync(button);
+    }
+  }
+  async function refreshConnections(){
+    try{
+      const status=await read('/api/calendar-status');connectionSources=status.sources||[];renderConnections();
+      if(retryRequestedAt&&status.updated>=retryRequestedAt&&byId('account-status').textContent==='Retrying calendar sync...'){
+        byId('account-status').textContent=connectionSources.every(s=>['ready','disabled'].includes(s.state))?'Calendar sync complete.':'Some calendar connections still need attention.';retryRequestedAt=0;
+      }
+    }
+    catch{for(const node of document.querySelectorAll('.calendar-link-status')){node.textContent='Connection status unavailable';node.dataset.level='warning';}}
+  }
+  window.addEventListener('calendar-rows-rendered',renderConnections);
+  setInterval(refreshConnections,15000);
   function providerStatus(){
     if(!apps)return;
     const provider=byId('account-provider').value;
@@ -16,17 +68,21 @@
       byId(`${provider}-client-secret`).value='';
       byId(`${provider}-client-secret`).placeholder=apps[provider].hasSecret?'Saved — leave blank to keep':'';
     }
-    const accounts=await read('/api/accounts');byId('connected-accounts').replaceChildren();
+    const accounts=await read('/api/accounts');accountsList=accounts;byId('connected-accounts').replaceChildren();
     if(!accounts.length)byId('connected-accounts').append(make('p','account-status','No accounts connected'));
     for(const account of accounts){
-      const row=make('div','account-row');const identity=make('div');
+      const row=make('div','account-row');row.dataset.accountId=account.id;const identity=make('div');
       identity.append(make('strong','',account.email||account.name),make('span','account-provider-label',account.provider==='google'?'Google':'Microsoft 365 / Outlook'));
+      const state=make('p','calendar-link-status','Checking connection...');state.setAttribute('role','status');identity.append(state);
       const choose=make('button','secondary','Select calendars');choose.type='button';choose.onclick=()=>openPicker(account.id);
       const remove=make('button','icon-button');remove.type='button';remove.title='Disconnect account';remove.setAttribute('aria-label',`Disconnect ${account.email||account.name}`);remove.innerHTML='<i data-lucide="trash-2"></i>';
       remove.onclick=async()=>{remove.disabled=true;try{await post('/api/accounts/remove',{accountId:account.id});await refreshAccounts();await load();}catch(e){byId('account-status').textContent=e.message;remove.disabled=false;}};
-      row.append(identity,choose,remove);byId('connected-accounts').append(row);
+      const renew=make('button','secondary','Reconnect');renew.type='button';renew.classList.add('reconnect-account');renew.onclick=()=>reconnect(account,renew);
+      const retry=make('button','icon-button');retry.type='button';retry.title='Retry calendar sync';retry.setAttribute('aria-label',retry.title);retry.innerHTML='<i data-lucide="refresh-cw"></i>';retry.onclick=()=>retrySync(retry);
+      const actions=make('div','account-actions');actions.append(choose,renew,retry,remove);
+      row.append(identity,actions);byId('connected-accounts').append(row);
     }
-    providerStatus();window.lucide?.createIcons();
+    providerStatus();window.lucide?.createIcons();await refreshConnections();
   }
   async function openPicker(id){
     selectedAccount=id;byId('available-calendars').replaceChildren();byId('picker-status').textContent='Loading calendars…';byId('save-selection').disabled=true;byId('calendar-picker').showModal();
@@ -64,7 +120,7 @@
   refreshAccounts().then(()=>{
     const query=new URLSearchParams(location.search);
     if(query.get('auth')==='failed')byId('account-status').textContent='Sign-in was cancelled or failed. Check the provider registration and try again.';
-    if(query.get('auth')==='connected')byId('account-status').textContent='Account connected. Select its calendars below.';
+    if(query.get('auth')==='connected')byId('account-status').textContent='Sign-in complete. Saved calendars have been retained.';
     if(query.has('auth'))history.replaceState({},'',location.pathname);
   }).catch(e=>byId('account-status').textContent=e.message);
 })();

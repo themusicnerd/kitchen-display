@@ -91,6 +91,9 @@ function calendarRow(source){
   if(source.accountId){label.firstChild.textContent=`${provider} · ${source.accountLabel||'Connected through sign-in'}`;row.querySelector('.feed').hidden=true;}
   row.querySelector('.choose-icon').onclick=()=>openIconPicker(row);
   row.querySelector('.remove').onclick=()=>{row.remove();$('save-status').textContent='Calendar removed from form. Save to apply.';};
+  const status=document.createElement('div');status.className='calendar-connection';
+  status.innerHTML='<p class="calendar-link-status" role="status">Checking connection...</p><button type="button" class="icon-button calendar-reconnect" title="Reconnect calendar" aria-label="Reconnect calendar"><i data-lucide="log-in"></i></button>';
+  row.append(status);
   $('calendar-sources').append(row);applyRowIcon(row,source.icon||'calendar-days');icons();
 }
 function sliders(){for(const id of ['weekHeight','fontWeight','nightBrightness'])$(id+'-value').textContent=$(id).value+(id==='fontWeight'?'':id==='nightBrightness'?'%':' px');}
@@ -101,6 +104,7 @@ async function load(){
   $('castKnownHosts').value=(config.castKnownHosts||[]).join(', ');
   $('visual-timer-settings').replaceChildren();(config.visualTimers||[]).forEach(visualTimerRow);
   $('calendar-sources').replaceChildren();config.calendars.forEach(calendarRow);sliders();icons();
+  window.dispatchEvent(new Event('calendar-rows-rendered'));
 }
 $('settings-form').onsubmit=e=>e.preventDefault();
 for(const id of ['weekHeight','fontWeight','nightBrightness'])$(id).oninput=sliders;

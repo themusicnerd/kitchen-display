@@ -27,6 +27,7 @@ import oauth_accounts as accounts
 import camera_config
 import cast_support
 import recovery
+from authlib.integrations.base_client.errors import OAuthError
 
 ROOT = Path(__file__).resolve().parent
 PRIVATE = Path.home() / '.config/kitchen-display'
@@ -265,17 +266,27 @@ def refresh_calendars():
             if source.get('accountId'):
                 items = accounts.event_window(source, first, last, tz, hide_private=conf['hidePrivateEvents'])
                 SOURCE_CACHE[source['id']] = (identity, items, time.time())
+                status['lastSuccess'] = SOURCE_CACHE[source['id']][2]
                 events.extend(items)
             elif not source['url']:
                 status['state'] = 'not connected'
             else:
                 items = expand_events(fetch_feed(source['url']), source, first, last, tz, hide_private=conf['hidePrivateEvents'])
                 SOURCE_CACHE[source['id']] = (identity, items, time.time())
+                status['lastSuccess'] = SOURCE_CACHE[source['id']][2]
                 events.extend(items)
         except Exception as exc:
             # Do not log exception strings: provider errors may contain secret feed URLs.
             logging.warning('Calendar fetch failed (%s); retrying with cached data when available.', type(exc).__name__)
             status['state'] = 'refresh failed'
+            if isinstance(exc, OAuthError):
+                status['issue'] = 'setup' if exc.error in ('invalid_client', 'unauthorized_client', 'invalid_scope') else 'auth'
+            elif isinstance(exc, requests.HTTPError) and exc.response is not None and exc.response.status_code in (401, 403):
+                status['issue'] = 'auth' if exc.response.status_code == 401 and source.get('accountId') else 'permission'
+            elif isinstance(exc, (requests.ConnectionError, requests.Timeout)):
+                status['issue'] = 'network'
+            else:
+                status['issue'] = 'refresh'
             cached = SOURCE_CACHE.get(source['id'])
             if cached and cached[0] == identity and -300 <= time.time() - cached[2] <= CACHE_MAX_AGE:
                 events.extend([{**item, 'source': source['name'], 'color': source['color']} for item in cached[1]])
@@ -308,6 +319,21 @@ def calendar_worker():
             delay = retry_delay
         WAKE.wait(delay)
         retry_delay = min(60, retry_delay * 2) if delay < 300 else 15
+
+
+def calendar_connection_status():
+    conf = settings()
+    with LOCK:
+        known = {s['id']: dict(s) for s in STATE['sources']}
+        updated = STATE['updated']
+    sources = []
+    for source in conf['calendars']:
+        status = known.get(source['id'], {'state': 'checking'})
+        if not source['enabled']:
+            status = {'state': 'disabled'}
+        sources.append({'id': source['id'], 'accountId': source.get('accountId'),
+                        **{key: status[key] for key in ('state', 'issue', 'lastSuccess') if key in status}})
+    return {'sources': sources, 'updated': updated}
 
 
 def save_settings(data):
@@ -508,6 +534,7 @@ class Handler(BaseHTTPRequestHandler):
             cookie = cookies.get('kitchen_oauth_' + provider)
             try:
                 accounts.complete(provider, parse_qs(urlsplit(self.path).query), cookie.value if cookie else '')
+                WAKE.set()
                 destination = '/settings?auth=connected'
             except Exception:
                 destination = '/settings?auth=failed'
@@ -535,6 +562,8 @@ class Handler(BaseHTTPRequestHandler):
                 if settings()['hidePrivateEvents']:
                     events = [e for e in events if not e.get('isPrivate')]
                 return self.send({**STATE, 'events': events})
+        if path == '/api/calendar-status':
+            return self.send(calendar_connection_status())
         if path == '/api/status':
             return self.send({'cameras': public_cameras(), 'now': time.time()})
         if path == '/api/recovery':
@@ -644,8 +673,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send(accounts.public_apps())
                 if self.headers.get('Host') != 'localhost:8090':
                     return self.send({'error': 'Open http://localhost:8090/settings on the kitchen display to sign in.'}, status=400)
-                provider = body['provider']
-                url, nonce = accounts.begin(provider, str(body.get('hint', '')))
+                reconnect_id = body.get('accountId')
+                if reconnect_id:
+                    account = next((a for a in accounts.public_accounts() if a['id'] == reconnect_id), None)
+                    if account is None:
+                        return self.send({'error': 'Account no longer connected.'}, status=404)
+                    provider = account['provider']
+                else:
+                    provider = body['provider']
+                url, nonce = accounts.begin(provider, str(body.get('hint', '')), reconnect_id=reconnect_id)
                 return self.send({'url': url}, headers={'Set-Cookie': f'kitchen_oauth_{provider}={nonce}; Path=/auth/; HttpOnly; SameSite=Lax; Max-Age=600'})
             if self.path == '/api/accounts/select':
                 select_account_calendars(body)

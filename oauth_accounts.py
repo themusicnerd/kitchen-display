@@ -91,10 +91,15 @@ def client(provider, app, **kwargs):
                          code_challenge_method='S256', **kwargs)
 
 
-def begin(provider, hint=''):
+def begin(provider, hint='', reconnect_id=None):
     if provider not in PROVIDERS:
         raise ValueError('Choose Google or Microsoft 365.')
     with LOCK:
+        if reconnect_id:
+            account = load(ACCOUNTS).get(reconnect_id)
+            if not account or account['provider'] != provider:
+                raise ValueError('Choose an existing account to reconnect.')
+            hint = account.get('email', '')
         app = load(APPS).get(provider, {})
         if not app.get('clientId') or (provider == 'google' and not app.get('clientSecret')):
             raise ValueError('Complete the one-time provider setup first.')
@@ -113,7 +118,7 @@ def begin(provider, hint=''):
                 del PENDING[key]
         if len(PENDING) >= 20:
             raise ValueError('Too many pending sign-ins. Try again later.')
-        PENDING[state] = {'provider': provider, 'verifier': verifier, 'browser': browser_nonce,
+        PENDING[state] = {'provider': provider, 'verifier': verifier, 'browser': browser_nonce, 'accountId': reconnect_id,
                           'created': now, 'app': app}
         return url, browser_nonce
 
@@ -146,6 +151,8 @@ def complete(provider, query, browser_nonce):
         email = profile.get('mail') or profile.get('userPrincipalName', '')
         name = profile.get('displayName') or email
     account_id = hashlib.sha256((provider + ':' + identity).encode()).hexdigest()[:24]
+    if pending.get('accountId') and pending['accountId'] != account_id:
+        raise ValueError('Reconnect using the same calendar account.')
     with LOCK:
         accounts = load(ACCOUNTS)
         previous = accounts.get(account_id, {})
