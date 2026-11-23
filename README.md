@@ -27,6 +27,12 @@ SHA-256 checksum, and installs Python dependencies in `.venv`. Existing settings
 are retained. Run as your desktop user, not root. It does not change automatic
 login, sleep settings, firewall rules, camera firmware or camera encoding.
 
+With `--kiosk`, installation also creates a **Kitchen Display** desktop shortcut
+and application-menu entry. Use either to reopen the kiosk after closing the
+browser. It starts the camera bridge, dashboard and browser user services without
+restarting anything already running or opening duplicate kiosk windows. On GNOME,
+choose Allow Launching if the desktop asks you to trust the new shortcut.
+
 Open **http://localhost:8090/settings** on the display. The dashboard is at
 http://localhost:8090/. Services start at user login, not before a login session.
 

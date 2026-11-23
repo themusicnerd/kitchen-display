@@ -15,7 +15,7 @@ class InstallTests(unittest.TestCase):
             home = Path(directory)/'home'
             root = home/'checkout with spaces'
             root.mkdir(parents=True)
-            for filename in ('kitchen-display.service', 'kitchen-cameras.service', 'kitchen-display-browser.service'):
+            for filename in ('kitchen-display.service', 'kitchen-cameras.service', 'kitchen-display-browser.service', 'kitchen-display-launcher.desktop'):
                 shutil.copy2(install.ROOT/filename, root/filename)
             private = home/'.config/kitchen-display'
             private.mkdir(parents=True)
@@ -30,6 +30,7 @@ class InstallTests(unittest.TestCase):
                  patch.object(install.os, 'getuid', return_value=1000), \
                  patch.object(install, 'BUILDS', {'x86_64': ('amd64', digest)}), \
                  patch.object(install.subprocess, 'run') as run, redirect_stdout(io.StringIO()):
+                run.return_value.stdout = str(home/'Desktop')+'\n'
                 with patch('sys.argv', ['install.py']):
                     install.main()
                     run.assert_not_called()
@@ -45,6 +46,10 @@ class InstallTests(unittest.TestCase):
                 browser_unit = (home/'.config/systemd/user/kitchen-display-browser.service').read_text()
                 self.assertIn(f'ExecStart=/bin/bash "{root}/start-kiosk.sh"', browser_unit)
                 self.assertFalse(any('sudo' in str(call) for call in run.call_args_list))
+                shortcut=home/'Desktop/Kitchen Display.desktop'
+                self.assertIn('Exec=systemctl --user start kitchen-cameras.service kitchen-display.service kitchen-display-browser.service',shortcut.read_text())
+                self.assertEqual(shortcut.stat().st_mode & 0o777,0o755)
+                self.assertEqual(shortcut.read_text(),(home/'.local/share/applications/kitchen-display-launcher.desktop').read_text())
 
 
 if __name__ == '__main__':

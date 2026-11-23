@@ -83,6 +83,26 @@ def main():
             shutil.copy2(autostart, autostart.with_suffix('.desktop.before-install'))
         autostart.write_text('[Desktop Entry]\nType=Application\nName=Kitchen Display\n'
                              'Exec=systemctl --user start kitchen-display-browser.service\nX-GNOME-Autostart-enabled=true\n')
+        try:
+            result = subprocess.run(['xdg-user-dir', 'DESKTOP'], check=True, capture_output=True, text=True, timeout=5)
+            desktop = Path(result.stdout.strip())
+            if not desktop.is_absolute():
+                desktop = Path.home()/'Desktop'
+        except (OSError, subprocess.SubprocessError):
+            desktop = Path.home()/'Desktop'
+        launcher = (ROOT/'kitchen-display-launcher.desktop').read_text()
+        for target in (desktop/'Kitchen Display.desktop', Path.home()/'.local/share/applications/kitchen-display-launcher.desktop'):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists() and target.read_text() != launcher:
+                shutil.copy2(target, target.with_suffix('.desktop.before-install'))
+            target.write_text(launcher)
+            target.chmod(0o755 if target.parent == desktop else 0o644)
+        if shutil.which('gio'):
+            try:
+                subprocess.run(['gio', 'set', str(desktop/'Kitchen Display.desktop'), 'metadata::trusted', 'true'],
+                               check=True, capture_output=True, text=True, timeout=5)
+            except (OSError, subprocess.SubprocessError):
+                print('Right-click the Kitchen Display desktop shortcut and choose Allow Launching if prompted.')
     subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
     subprocess.run(['systemctl', '--user', 'enable', '--now', 'kitchen-cameras.service', 'kitchen-display.service'], check=True)
     subprocess.run(['systemctl', '--user', 'restart', 'kitchen-cameras.service', 'kitchen-display.service'], check=True)
