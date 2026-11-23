@@ -6,7 +6,7 @@
   const picker=document.createElement('dialog');picker.id='cast-picker';picker.setAttribute('aria-labelledby','cast-heading');
   picker.innerHTML='<div class="dialog-heading"><h2 id="cast-heading">Cast timer</h2><button id="close-cast-picker" class="icon-button view-close" type="button" title="Close" aria-label="Close cast picker"><i data-lucide="x"></i></button></div><p id="cast-timer-name" class="cast-timer-name"></p><div class="cast-screen-picker"><label>Screen<select id="cast-screen"><option value="">Choose a screen</option></select></label><button id="refresh-cast-screens" class="icon-button" type="button" title="Refresh Cast screens" aria-label="Refresh Cast screens"><i data-lucide="refresh-cw"></i></button></div><p id="cast-status" class="account-status" role="status"></p><div class="cast-picker-actions"><button id="start-cast" class="primary" type="button" disabled><i data-lucide="cast"></i>Cast</button></div><div id="cast-sessions"></div>';
   document.body.append(picker);
-  let selected=null,sessions=[],busy=false,polling=false,lastPoll=0;
+  let selected=null,sessions=[],busy=false,searching=false,polling=false,lastPoll=0;
   const fingerprints=new Map();
   async function request(path,body){
     const response=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json','X-Kitchen-Request':'1'},body:JSON.stringify(body)}:{});
@@ -24,7 +24,7 @@
       const row=document.createElement('div');row.className='cast-session';
       const recent=session.lastSeen&&Date.now()/1000-session.lastSeen<8;
       const label=document.createElement('span');label.textContent=session.deviceName+(recent?' · Connected':session.lastSeen?' · Connection lost':' · Waiting for screen');
-      const stop=document.createElement('button');stop.className='icon-button';stop.type='button';stop.title='Stop sharing to '+session.deviceName;stop.setAttribute('aria-label',stop.title);stop.innerHTML='<i data-lucide="square"></i>';
+      const stop=document.createElement('button');stop.className='icon-button cast-stop';stop.type='button';stop.title='Stop sharing to '+session.deviceName;stop.setAttribute('aria-label',stop.title);stop.innerHTML='<i data-lucide="square"></i>';
       stop.onclick=async()=>{stop.disabled=true;try{await request('/api/cast/stop',{clientId,sessionId:session.id});sessions=sessions.filter(item=>item.id!==session.id);fingerprints.delete(session.id);renderSessions();$('cast-status').textContent='Timer sharing stopped.';}catch(error){$('cast-status').textContent=error.message;stop.disabled=false;}};
       row.append(label,stop);$('cast-sessions').append(row);
     }
@@ -37,6 +37,8 @@
     }
   }
   async function devices(refresh=false){
+    if(searching||busy)return;
+    searching=true;$('refresh-cast-screens').setAttribute('aria-busy','true');$('cast-screen').disabled=true;
     $('refresh-cast-screens').disabled=true;$('start-cast').disabled=true;$('cast-status').textContent='Looking for Cast screens...';
     try{
       const value=await request('/api/cast/devices',{refresh}),previous=$('cast-screen').value;
@@ -46,7 +48,7 @@
       $('cast-status').textContent=value.devices.length?'':'No Cast screens found. Check the TV and LAN connection.';
       $('start-cast').disabled=!$('cast-screen').value;
     }catch(error){$('cast-status').textContent=error.message;}
-    finally{$('refresh-cast-screens').disabled=false;}
+    finally{searching=false;$('refresh-cast-screens').disabled=false;$('refresh-cast-screens').setAttribute('aria-busy','false');$('cast-screen').disabled=false;}
   }
   async function open(source){
     if(!config||config.castEnabled===false)return;
@@ -59,11 +61,11 @@
     element.dataset.castKind=source.kind;element.dataset.castId=source.id;element.title='Cast this timer';element.setAttribute('aria-label',element.title);element.hidden=config?.castEnabled===false;
     element.innerHTML='<i data-lucide="cast"></i>';element.onclick=event=>{event.stopPropagation();open(source);};return element;
   }
-  $('cast-screen').onchange=()=>$('start-cast').disabled=!$('cast-screen').value||busy;
+  $('cast-screen').onchange=()=>$('start-cast').disabled=!$('cast-screen').value||busy||searching;
   $('refresh-cast-screens').onclick=()=>devices(true);
   $('close-cast-picker').onclick=()=>picker.close();
   $('start-cast').onclick=async()=>{
-    if(!selected||!$('cast-screen').value||busy)return;
+    if(!selected||!$('cast-screen').value||busy||searching)return;
     busy=true;$('start-cast').disabled=true;$('cast-status').textContent='Connecting to screen...';
     try{
       const data=payload(selected),job=await request('/api/cast/start',{...data,deviceId:$('cast-screen').value});

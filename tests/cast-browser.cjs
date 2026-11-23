@@ -10,6 +10,8 @@ const os=require('node:os');
   const base=process.env.TEST_URL||'http://127.0.0.1:8090';
   const config={revision:'fixture',title:'Cast tests',timezone:'Australia/Sydney',upcomingWeeks:3,weekHeight:640,fontWeight:460,cameraHeight:230,theme:'dark',paperTexture:false,cameraFit:'contain',showCamera:false,hidePrivateEvents:true,nightEnabled:false,timeToolsEnabled:true,visualTimersEnabled:true,castEnabled:true,visualTimers:[{id:'a',name:'Get ready',group:'Activities',enabled:true,days:[0,1,2,3,4,5,6],time:'09:00',variant:'any',icon:'backpack'}],calendars:[],cameras:[]};
   const errors=[],calls=[];let sessions=[];
+  let releaseDiscovery,failDiscovery=false;
+  let discoveryGate=new Promise(resolve=>releaseDiscovery=resolve);
   fs.mkdirSync(path.join(__dirname,'../test-results'),{recursive:true});
   try{
     await browser.route('**/api/**',async route=>{
@@ -17,7 +19,11 @@ const os=require('node:os');
       if(url.pathname==='/api/settings')return route.fulfill({json:config});
       if(url.pathname==='/api/events')return route.fulfill({json:{events:[],sources:[],updated:null}});
       if(url.pathname==='/api/cameras')return route.fulfill({json:{revision:'fixture',cameras:[]}});
-      if(url.pathname==='/api/cast/devices')return route.fulfill({json:{devices:[{id:'screen-one',name:'Test TV',model:'Cast screen'}]}});
+      if(url.pathname==='/api/cast/devices'){
+        await discoveryGate;
+        if(failDiscovery)return route.fulfill({status:503,json:{error:'Discovery unavailable'}});
+        return route.fulfill({json:{devices:[{id:'screen-one',name:'Test TV',model:'Cast screen'}]}});
+      }
       if(url.pathname==='/api/cast/state')return route.fulfill({json:{sessions}});
       if(url.pathname==='/api/cast/start'){
         calls.push({action:'start',data});const job={id:'session-one',deviceName:'Test TV',source:data.source,clientId:data.clientId,lastSeen:Date.now()/1000};sessions=[job];return route.fulfill({json:job});
@@ -33,11 +39,24 @@ const os=require('node:os');
     assert.equal(await page.locator('.timer-remaining').first().textContent(),'05:00');
     await page.locator('.timer-toggle').first().click();
     await page.locator('.timer-row .cast-source').first().click();
+    assert.equal(await page.locator('#refresh-cast-screens').getAttribute('aria-busy'),'true');
+    assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('#refresh-cast-screens svg')).animationName),'cast-search-spin');
+    assert(await page.locator('#cast-screen').isDisabled());assert(await page.locator('#start-cast').isDisabled());
+    await page.screenshot({path:path.join(__dirname,'../test-results/cast-searching.png')});
+    await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('#refresh-cast-screens svg')).animationName),'none');await page.emulateMedia({reducedMotion:'no-preference'});
+    releaseDiscovery();discoveryGate=Promise.resolve();
     await page.locator('#cast-screen option[value=screen-one]').waitFor({state:'attached'});
+    assert.equal(await page.locator('#refresh-cast-screens').getAttribute('aria-busy'),'false');assert(await page.locator('#cast-screen').isEnabled());
+    failDiscovery=true;await page.locator('#refresh-cast-screens').click();
+    await page.locator('#cast-status').filter({hasText:'Discovery unavailable'}).waitFor();
+    assert.equal(await page.locator('#refresh-cast-screens').getAttribute('aria-busy'),'false');assert(await page.locator('#refresh-cast-screens').isEnabled());
+    failDiscovery=false;await page.locator('#refresh-cast-screens').click();
+    await page.locator('#cast-status').filter({hasText:'Discovery unavailable'}).waitFor({state:'hidden'});
     assert.equal(calls.length,0,'Opening the picker must never launch a TV');
     assert(await page.locator('#start-cast').isDisabled());
     await page.locator('#cast-screen').selectOption('screen-one');await page.locator('#start-cast').click();
     await page.waitForFunction(()=>document.querySelector('#cast-sessions').textContent.includes('Connected'));
+    const stopStyle=await page.evaluate(()=>{const s=getComputedStyle(document.querySelector('.cast-stop svg'));return {fill:s.fill,color:s.color};});assert.equal(stopStyle.fill,stopStyle.color,'Stop icon is filled');
     assert.equal(calls[0].data.source.kind,'countdown');assert.equal(calls[0].data.timer.status,'running');
     sessions[0].lastSeen=Date.now()/1000-20;
     for(let i=0;i<60&&!await page.locator('#cast-sessions').textContent().then(text=>text.includes('Connection lost'));i++)await page.waitForTimeout(100);
