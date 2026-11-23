@@ -160,7 +160,7 @@
     for(const timer of state.timers){
       if(timer.status==='running'&&T.remaining(timer,now)===0){Object.assign(timer,{status:'finished',finishedAt:timer.endAt,remainingMs:0,endAt:null,acknowledged:false});changed=true;}
       const row=el('timer-list').querySelector(`[data-timer="${timer.id}"]`);if(!row)continue;
-      row.querySelector('.timer-remaining').textContent=timer.status==='finished'?T.overdueText(now-timer.finishedAt):T.durationText(Math.ceil(T.remaining(timer,now)/1000)*1000);
+      row.querySelector('.timer-remaining').textContent=timer.status==='finished'?T.overdueText(now-timer.finishedAt):T.countdownText(T.remaining(timer,now));
       row.dataset.alert=String(timer.status==='finished'&&!timer.acknowledged);
       row.dataset.status=timer.status;row.querySelector('.timer-state').textContent={idle:'Ready',running:'Running',paused:'Paused',finished:timer.acknowledged?'Finished':'Time is up'}[timer.status];
       glyph(row.querySelector('.timer-toggle'),timer.status==='running'?'pause':'play',timer.status==='running'?'Pause timer':'Start timer');
@@ -192,7 +192,7 @@
       glyph(el('stopwatch-toggle'),state.stopwatch.startedAt===null?'play':'pause',state.stopwatch.startedAt===null?'Start stopwatch':'Pause stopwatch');
       el('stopwatch-lap').disabled=state.stopwatch.startedAt===null||state.stopwatch.laps.length>=100;
       if(view==='activities')for(const row of el('activity-timers').querySelectorAll('[data-at]')){
-        const at=Number(row.dataset.at),remaining=Math.max(0,at-now);row.querySelector('output').textContent=remaining?T.durationText(Math.ceil(remaining/1000)*1000):T.overdueText(now-at);row.querySelector('progress').value=remaining;row.querySelector('progress').hidden=!remaining;row.querySelector('.activity-state').textContent=remaining>3600000?'More than an hour':remaining?'Time remaining':'Since finished';row.dataset.reached=String(!remaining);row.dataset.alert=String(!remaining);
+        const at=Number(row.dataset.at),remaining=Math.max(0,at-now);row.querySelector('output').textContent=remaining?T.countdownText(remaining):T.overdueText(now-at);row.querySelector('progress').value=remaining;row.querySelector('progress').hidden=!remaining;row.querySelector('.activity-state').textContent=remaining>3600000?'More than an hour':remaining?'Time remaining':'Since finished';row.dataset.reached=String(!remaining);row.dataset.alert=String(!remaining);
       }
     }
     glyph(el('timer-sound'),state.sound?'volume-2':'volume-x',state.sound?'Mute timer sound':'Enable timer sound');

@@ -146,7 +146,11 @@ Appearance in Settings takes precedence when that change reaches the display.
 
 ## Timers and Get Ready
 
-Expired countdowns show `+MM:SS`, counting time since the deadline, with a slow
+Countdowns use `HH:MM:SS`, dropping leading zero hour/minute fields: `01:05:09`,
+`05:09`, then `09`. Zero middle fields are retained (`01:00:09`). This applies to
+normal timers, activity lists, expanded countdowns and Cast receivers; stopwatch
+formatting is unchanged. Expired countdowns use the same format prefixed by `+`,
+counting time since the deadline, with a slow
 red background pulse instead of the hour pie or minute ring. This applies to
 normal timers, activity countdowns and Cast receivers. Dismissing a normal timer
 stops its alert/pulse but leaves the overtime clock visible until reset. Reduced
@@ -171,8 +175,8 @@ after every timer for that activity has passed, it advances to its next occurren
 Progress bars show the final hour. Activity countdowns are visual, not audible
 alarms. Touch an activity countdown to fill the area below the activity controls
 with a large clock over a 60-minute pie countdown. More than an hour stays full;
-the final hour shrinks to empty at the target time. The centred clock uses total
-minutes and seconds (`MM:SS`), without a status label. An outer seconds ring drains
+the final hour shrinks to empty at the target time. The centred clock hides
+leading zero hour/minute fields, without a status label. An outer seconds ring drains
 through each minute, refills at the next minute and stays empty when time is up.
 The back arrow or Escape
 returns to all activity timers; the X still closes the whole clock view. Camera

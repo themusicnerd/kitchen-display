@@ -30,6 +30,7 @@ const os=require('node:os');
     await page.goto(base);await page.waitForFunction(()=>typeof config!=='undefined'&&config);
     await page.evaluate(()=>localStorage.removeItem('kitchen-time-tools'));await page.reload();
     await page.locator('#open-time-tools').click();
+    assert.equal(await page.locator('.timer-remaining').first().textContent(),'05:00');
     await page.locator('.timer-toggle').first().click();
     await page.locator('.timer-row .cast-source').first().click();
     await page.locator('#cast-screen option[value=screen-one]').waitFor({state:'attached'});
@@ -52,6 +53,14 @@ const os=require('node:os');
     await page.locator('#close-cast-picker').click();await page.locator('.activity-expand').click();
     await page.locator('#activity-focus .cast-source').click();assert(await page.locator('#cast-picker').isVisible());
     await page.locator('#close-cast-picker').click();
+    await page.evaluate(()=>{window.countdownRealNow=Date.now;window.countdownTarget=Number(document.querySelector('.activity-timer').dataset.at);});
+    for(const [remaining,text] of [[3600000,'01:00:00'],[60000,'01:00'],[9000,'09']]){
+      await page.evaluate(ms=>Date.now=()=>window.countdownTarget-ms,remaining);
+      for(let i=0;i<30&&await page.locator('#activity-focus-remaining').textContent()!==text;i++)await page.waitForTimeout(100);
+      assert.equal(await page.locator('#activity-focus-remaining').textContent(),text);
+      assert.equal(await page.locator('.activity-remaining').first().textContent(),text);
+    }
+    await page.evaluate(()=>Date.now=window.countdownRealNow);
     await page.screenshot({path:path.join(__dirname,'../test-results/cast-touch.png')});
     await page.locator('#tab-stopwatch').click();await page.locator('#stopwatch-toggle').click();
     await page.locator('#cast-stopwatch').click();
@@ -85,7 +94,7 @@ const os=require('node:os');
     }
     timer={...timer,status:'paused',endAt:null,remainingMs:45000};
     for(let i=0;i<60&&await tv.locator('#tv-state').textContent()!=='Paused';i++)await tv.waitForTimeout(100);
-    assert.equal(await tv.locator('#activity-focus-remaining').textContent(),'00:45');
+    assert.equal(await tv.locator('#activity-focus-remaining').textContent(),'45');
     timer={...timer,status:'finished',finishedAt:Date.now()-65000,remainingMs:0,acknowledged:false};
     for(let i=0;i<60&&!await tv.locator('#activity-focus-remaining').textContent().then(text=>text.startsWith('+'));i++)await tv.waitForTimeout(100);
     assert.match(await tv.locator('#activity-focus-remaining').textContent(),/^\+01:/);assert(await tv.locator('#activity-pie').isHidden());assert(await tv.locator('#activity-minute-ring').isHidden());

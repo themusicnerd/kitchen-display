@@ -75,13 +75,19 @@ async function until(page,predicate){for(let i=0;i<150;i++){if(await page.evalua
     await settings.locator('#theme').selectOption('dark');await until(page,()=>document.body.dataset.theme==='dark');await page.setViewportSize({width:1080,height:1920});await page.waitForTimeout(800);
     await page.screenshot({path:path.join(__dirname,'../test-results/activity-focus-dark.png')});
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt-7200000);await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='1');
-    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'120:00','Hours become total minutes, not discarded time');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'02:00:00','Hours are shown without losing zero middle fields');
+    for(const [remaining,text] of [[3600000,'01:00:00'],[60000,'01:00'],[9000,'09']]){
+      await page.evaluate(ms=>Date.now=()=>window.focusedTestAt-ms,remaining);
+      await until(page,()=>document.getElementById('activity-focus-remaining').textContent===KitchenTiming.countdownText(window.focusedTestAt-Date.now()));
+      assert.equal(await page.locator('#activity-focus-remaining').textContent(),text);
+      assert.equal(await page.locator('.activity-remaining').first().textContent(),text,'Activity list matches expanded clock');
+    }
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt-1800001);
     await until(page,()=>Number(document.getElementById('activity-dial').dataset.minuteFraction)<.001);
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt-1800000);
     await until(page,()=>document.getElementById('activity-dial').dataset.minuteFraction==='1');
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt+1);await until(page,()=>document.getElementById('activity-dial').dataset.fraction==='0');
-    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'+00:00');assert.equal(await page.locator('#activity-dial').getAttribute('data-minute-fraction'),'0');
+    assert.equal(await page.locator('#activity-focus-remaining').textContent(),'+00');assert.equal(await page.locator('#activity-dial').getAttribute('data-minute-fraction'),'0');
     assert(await page.locator('#activity-pie').isHidden());assert(await page.locator('#activity-minute-ring').isHidden());
     await page.evaluate(()=>Date.now=()=>window.focusedTestAt+65000);await until(page,()=>document.getElementById('activity-focus-remaining').textContent==='+01:05');
     assert.equal(await page.locator('#activity-dial').evaluate(el=>getComputedStyle(el).animationName),'overdue-pulse');
@@ -100,6 +106,7 @@ async function until(page,predicate){for(let i=0;i<150;i++){if(await page.evalua
     }
     await page.locator('#close-time-tools').click();await page.setViewportSize({width:1080,height:1920});
     await page.locator('#open-time-tools').click();assert.equal(await page.locator('.timer-row').count(),1);
+    assert.equal(await page.locator('.timer-remaining').first().textContent(),'05:00','Regular countdown drops the zero hour field');
     await page.locator('#timer-sound').click();
     const first=page.locator('.timer-row').first();await first.locator('.timer-minutes').fill('0');await first.locator('.timer-minutes').dispatchEvent('change');await first.locator('.timer-seconds').fill('2');await first.locator('.timer-seconds').dispatchEvent('change');
     await first.locator('.timer-toggle').click();await page.locator('#add-timer').click();

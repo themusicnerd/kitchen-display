@@ -4,7 +4,9 @@
   function minuteFraction(remainingMs){return remainingMs>0?(remainingMs%60000||60000)/60000:0;}
   function countdownText(remainingMs){
     const seconds=Math.max(0,Math.ceil(remainingMs/1000));
-    return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
+    const hours=Math.floor(seconds/3600),minutes=Math.floor(seconds/60)%60;
+    const parts=[hours,minutes,seconds%60].map(value=>String(value).padStart(2,'0'));
+    return parts.slice(hours?0:minutes?1:2).join(':');
   }
   function remaining(timer,now=Date.now()){
     return Math.max(0,timer.status==='running'?timer.endAt-now:timer.remainingMs);
