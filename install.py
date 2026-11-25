@@ -59,7 +59,10 @@ def main():
                    cwd=ROOT, check=True)
     units = Path.home()/'.config/systemd/user'
     units.mkdir(parents=True, exist_ok=True)
-    for name in ('kitchen-display', 'kitchen-cameras'):
+    unit_names = ['kitchen-display', 'kitchen-cameras']
+    if args.kiosk:
+        unit_names.append('kitchen-display-open')
+    for name in unit_names:
         source = (ROOT/(name+'.service')).read_text()
         source = source.replace('WorkingDirectory=%h/kitchen-display', f'WorkingDirectory="{ROOT}"')
         prefix = f'ExecStart="{ROOT}/.venv/bin/python" "{ROOT}/server.py"' if name == 'kitchen-display' else f'ExecStart="{ROOT}/bin/go2rtc"'

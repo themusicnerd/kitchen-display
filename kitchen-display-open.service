@@ -1,0 +1,8 @@
+[Unit]
+Description=Open the kitchen dashboard
+Requires=kitchen-display.service kitchen-cameras.service
+After=kitchen-display.service kitchen-cameras.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl --user restart kitchen-display-browser.service

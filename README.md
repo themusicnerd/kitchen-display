@@ -29,8 +29,10 @@ login, sleep settings, firewall rules, camera firmware or camera encoding.
 
 With `--kiosk`, installation also creates a **Kitchen Display** desktop shortcut
 and application-menu entry. Use either to reopen the kiosk after closing the
-browser. It starts the camera bridge, dashboard and browser user services without
-restarting anything already running or opening duplicate kiosk windows. On GNOME,
+browser, or return from a Google/provider page. It starts stopped backend services
+and reopens just the kiosk browser at the dashboard, rather than opening duplicate
+windows. Running Cast receivers and backend services are not restarted. Unsaved
+browser forms are lost; saved timer state remains in that browser profile. On GNOME,
 choose Allow Launching if the desktop asks you to trust the new shortcut.
 
 Open **http://localhost:8090/settings** on the display. The dashboard is at

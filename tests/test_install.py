@@ -15,7 +15,7 @@ class InstallTests(unittest.TestCase):
             home = Path(directory)/'home'
             root = home/'checkout with spaces'
             root.mkdir(parents=True)
-            for filename in ('kitchen-display.service', 'kitchen-cameras.service', 'kitchen-display-browser.service', 'kitchen-display-launcher.desktop'):
+            for filename in ('kitchen-display.service', 'kitchen-cameras.service', 'kitchen-display-browser.service', 'kitchen-display-launcher.desktop', 'kitchen-display-open.service'):
                 shutil.copy2(install.ROOT/filename, root/filename)
             private = home/'.config/kitchen-display'
             private.mkdir(parents=True)
@@ -47,7 +47,11 @@ class InstallTests(unittest.TestCase):
                 self.assertIn(f'ExecStart=/bin/bash "{root}/start-kiosk.sh"', browser_unit)
                 self.assertFalse(any('sudo' in str(call) for call in run.call_args_list))
                 shortcut=home/'Desktop/Kitchen Display.desktop'
-                self.assertIn('Exec=systemctl --user start kitchen-cameras.service kitchen-display.service kitchen-display-browser.service',shortcut.read_text())
+                self.assertIn('Exec=systemctl --user start kitchen-display-open.service',shortcut.read_text())
+                opening=(home/'.config/systemd/user/kitchen-display-open.service').read_text()
+                self.assertIn('Requires=kitchen-display.service kitchen-cameras.service',opening)
+                self.assertIn('ExecStart=/usr/bin/systemctl --user restart kitchen-display-browser.service',opening)
+                self.assertNotIn('RemainAfterExit=true',opening)
                 self.assertEqual(shortcut.stat().st_mode & 0o777,0o755)
                 self.assertEqual(shortcut.read_text(),(home/'.local/share/applications/kitchen-display-launcher.desktop').read_text())
 
